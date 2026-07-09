@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --paper:#F6F5F1; --card:#FFFFFF; --ink:#19231F; --ink-2:#54625B; --line:#E2E0D8;
@@ -32,16 +33,18 @@ aside{width:238px;min-height:100vh;background:var(--side);color:var(--side-ink);
 .sync{display:flex;align-items:center;gap:7px;font-size:11px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.05);margin-top:10px}
 .sync .dot{width:8px;height:8px;border-radius:99px;background:#4CC38A;flex-shrink:0}
 .sync.err .dot{background:#E5484D}
+.upl{display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 10px;border:1px dashed rgba(255,255,255,.25);border-radius:8px;background:none;color:var(--side-ink);font:inherit;font-size:12px;width:100%;cursor:pointer}
+.upl:hover{background:rgba(255,255,255,.06);color:#fff}
 main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1340px}
 .topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
 .topbar h1{font-size:22px;font-weight:700}
 .topbar .sub{color:var(--ink-2);margin-top:3px;font-size:13px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-select{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+select,button.btn{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer}
 label.flbl{font-size:12px;color:var(--ink-2)}
 .grid{display:grid;gap:14px}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(178px,1fr))}
-.cards2{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.cards2{grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
 .card h3{font-size:13.5px;font-weight:700;margin-bottom:12px}
 .card h3 .hint{font-family:'IBM Plex Sans',sans-serif;font-weight:400;font-size:11.5px;color:var(--ink-2);margin-left:6px}
@@ -49,8 +52,8 @@ label.flbl{font-size:12px;color:var(--ink-2)}
 .kpi .val{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:6px}
 .kpi .delta{font-size:12px;margin-top:4px;color:var(--ink-2)}
 .delta.pos{color:var(--green)} .delta.neg{color:var(--red)}
-.charts2{grid-template-columns:1.4fr 1fr}
-@media(max-width:1100px){.charts2{grid-template-columns:1fr}}
+.charts2{grid-template-columns:1fr 1fr}
+@media(max-width:1100px){.charts2{grid-template-columns:1fr}.cards2{grid-template-columns:1fr}}
 .chartbox{position:relative;height:250px}
 .sp{height:14px}
 .tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
@@ -60,45 +63,53 @@ td{padding:9px 12px;border-bottom:1px solid #F0EEE8;white-space:nowrap}
 tr:hover td{background:#FAF9F5}
 td.r,th.r{text-align:right}
 td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
-.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.3px}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:600;letter-spacing:.3px;margin:2px 6px 2px 0}
 .badge.g{background:var(--green-soft);color:var(--green)}
 .badge.y{background:var(--gold-soft);color:var(--gold)}
 .badge.r{background:var(--red-soft);color:var(--red)}
 .badge.n{background:#EEEDE8;color:var(--ink-2)}
-.kcard{background:#fff;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:8px;padding:14px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
-.kcard:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(25,35,31,.12)}
-.kcard .t{font-weight:700;font-size:15px;font-family:'Archivo',sans-serif}
+.kcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:.15s;display:flex;gap:18px;align-items:center}
+.kcard:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(25,35,31,.14)}
+.kcard .gz{flex-shrink:0;text-align:center}
+.kcard .gz .glab{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;margin-top:2px}
+.kcard .info{min-width:0;flex:1}
+.kcard .t{font-weight:700;font-size:16px;font-family:'Archivo',sans-serif}
 .kcard .m{color:var(--ink-2);margin-top:2px;font-size:12px}
-.kcard .v{font-family:'IBM Plex Mono',monospace;font-weight:600;margin-top:8px;font-size:18px}
-.kcard .fx{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.kcard .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kcard .mini .mi{background:#FBFAF7;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.kcard .mini .mi .k{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-2)}
+.kcard .mini .mi .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;margin-top:2px}
 .bar{height:20px;background:var(--green-soft);border-radius:10px;overflow:hidden;position:relative;margin:8px 0 4px}
 .bar>div{height:100%;background:linear-gradient(90deg,var(--green),#1E7A63);border-radius:10px}
 .bar span{position:absolute;left:50%;top:0;transform:translateX(-50%);font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--ink);line-height:20px}
+#banner{display:none;max-width:100%;margin-bottom:14px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;font-size:12.5px}
 #err{max-width:640px;margin:60px auto;background:var(--red-soft);border:1px solid var(--red);border-radius:10px;padding:24px;display:none}
 #err h2{color:var(--red);margin-bottom:8px}
 #err code{background:#fff;padding:2px 6px;border-radius:4px;font-size:12px}
+#drop-ov{position:fixed;inset:0;background:rgba(16,33,27,.82);z-index:99;display:none;align-items:center;justify-content:center;color:#fff;font-size:20px;font-family:'Archivo',sans-serif;border:6px dashed rgba(255,255,255,.35)}
 @media print{aside{display:none}.card{break-inside:avoid}}
 </style>
 </head>
 <body>
+<div id="drop-ov">Solte o consolidado (.xlsx) para carregar</div>
 <aside>
   <div class="brand">Highpar<small>Monitoramento · CRI</small></div>
   <div class="navsec">Portfólio</div>
   <button class="nav-btn active" data-view="port" onclick="nav('port')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Visão geral</button>
   <div class="navsec">Emissões</div>
   <div id="navemis"></div>
+  <button class="upl" onclick="document.getElementById('file').click()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v3h16v-3"/></svg>Carregar consolidado…</button>
+  <input type="file" id="file" accept=".xlsx" multiple style="display:none">
   <div class="sync" id="sync"><span class="dot"></span><span id="sync-txt">carregando…</span></div>
   <div class="side-foot">Banco: site/dados.json<br>Atualize com atualizar_dados.py</div>
 </aside>
 <main>
+<div id="banner"></div>
 <div id="err"><h2>Base de dados não carregada</h2>
-<p>O portal lê o arquivo <code>dados.json</code> na mesma pasta. Se você abriu o index.html direto do disco, rode um servidor local:</p>
-<p style="margin-top:8px"><code>python -m http.server 8080</code> e acesse <code>http://localhost:8080</code> — ou publique a pasta no GitHub Pages.</p></div>
+<p>O portal lê <code>dados.json</code> na mesma pasta. Abrindo direto do disco, rode <code>python -m http.server 8080</code> e acesse <code>http://localhost:8080</code> — ou publique no GitHub Pages. Você também pode arrastar um consolidado .xlsx para esta janela.</p></div>
 
 <section class="view" id="view-port" style="display:block">
-  <div class="topbar">
-    <div><h1>Portfólio de CRIs</h1><div class="sub" id="port-sub">—</div></div>
-  </div>
+  <div class="topbar"><div><h1>Portfólio de CRIs</h1><div class="sub" id="port-sub">—</div></div></div>
   <div class="grid kpis" id="port-kpis"></div>
   <div class="sp"></div>
   <div class="grid cards2" id="port-cards"></div>
@@ -113,21 +124,22 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
   <div class="grid kpis" id="e-kpis"></div>
   <div class="sp"></div>
   <div class="grid charts2">
+    <div class="card"><h3>Fluxo do investidor <span class="hint" id="pb-hint">aportes × retornos · payback</span></h3><div class="chartbox"><canvas id="ch_fluxo"></canvas></div></div>
+    <div class="card"><h3>Razões de garantia <span class="hint">ILG por série e LTV, linha do tempo</span></h3><div class="chartbox"><canvas id="ch_razoes"></canvas></div></div>
+  </div>
+  <div class="sp"></div>
+  <div class="grid charts2">
     <div class="card"><h3>Recebimentos da carteira <span class="hint">diário, mês selecionado</span></h3><div class="chartbox"><canvas id="ch_receb"></canvas></div></div>
-    <div class="card"><h3>Evolução mensal <span class="hint">saldos e VP</span></h3><div class="chartbox"><canvas id="ch_evo"></canvas></div></div>
-  </div>
-  <div class="sp"></div>
-  <div class="grid charts2">
     <div class="card"><h3>Aging da inadimplência <span class="hint">mês selecionado</span></h3><div class="chartbox"><canvas id="ch_aging"></canvas></div></div>
-    <div class="card"><h3>Obra — evolução física<div class="bar"><div id="obra_bar" style="width:0%"></div><span id="obra_pct"></span></div></h3><div class="chartbox"><canvas id="ch_obra"></canvas></div></div>
   </div>
   <div class="sp"></div>
   <div class="grid charts2">
+    <div class="card"><h3>Obra — evolução física<div class="bar"><div id="obra_bar" style="width:0%"></div><span id="obra_pct"></span></div></h3><div class="chartbox"><canvas id="ch_obra"></canvas></div></div>
     <div class="tablewrap" id="e-carac"></div>
-    <div class="tablewrap" id="e-farolhist"></div>
   </div>
   <div class="sp"></div>
   <div class="tablewrap" id="e-tbl"></div>
+  <div style="margin-top:10px"><button class="btn" id="btn-all" onclick="TOGGLE_ALL=!TOGGLE_ALL;RE()">mostrar todas as métricas</button></div>
 </section>
 </main>
 
@@ -139,14 +151,88 @@ const fmt = (v,dec=0)=> v==null?'—':v.toLocaleString('pt-BR',{minimumFractionD
 const fBRL=v=> v==null?'—':(Math.abs(v)>=1e6? 'R$ '+(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:2})+' mi' : 'R$ '+fmt(v));
 const mmYY=m=>{const [a,b]=m.split('-');return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+b-1]+'/'+a.slice(2)};
 const bcls={'VERDE':'g','AMARELO':'y','VERMELHO':'r','S/ DADO':'n'};
-const fVal=(v,f)=> v==null?'—':(f==='pct'? (v<=3? fmt(v*100,1)+'%' : fmt(v,2)) : f==='x'? fmt(v,2)+'x' : fmt(v,2));
-let DB=null, CUR=null, CH={};
+let DB={emissoes:[]}, CUR=null, CH={}, TOGGLE_ALL=false;
 
 function g(o,k){return o&&o[k]!=null?o[k]:null}
-// heurísticas genéricas: acha métrica por padrão de nome, sem hardcode de emissão
+const norm=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 function achar(mets, ...padroes){
-  for(const p of padroes){ const re=new RegExp(p,'i'); const hit=mets.find(m=>re.test(m)); if(hit) return hit; }
+  for(const p of padroes){const re=new RegExp(norm(p),'i');const hit=mets.find(m=>re.test(norm(m)));if(hit)return hit;}
   return null;
+}
+// ============ FAROL CALCULADO NO CÓDIGO (nunca vem da planilha) ============
+// ILG por série = Garantias ÷ Dívida da série | LTV = Dívida total ÷ Garantias
+// Carteira do mês = recebido (extrato) ÷ esperado (BD_Receber)
+function regra(e, ...pads){
+  for(const p of pads){const re=new RegExp(p,'i');
+    const r=(e.farol_regras||[]).find(x=>re.test(x.indicador)); if(r)return r;}
+  return null;
+}
+function ratios(e, m){
+  const K=e.kpi[m]||{}; const mets=Object.keys(K);
+  // garantias: métrica pronta OU composição A+(B+C)*D
+  let gar=g(K,achar(mets,'garantia'));
+  if(gar==null){
+    const A=g(K,achar(mets,'^\\(A\\)')),B=g(K,achar(mets,'^\\(B\\)')),C=g(K,achar(mets,'^\\(C\\)')),D=g(K,achar(mets,'^\\(D\\)'));
+    if(A!=null&&B!=null&&D!=null) gar=A+(B+(C||0))*D;
+  }
+  const ilg={}, div={};
+  (e.series||[]).forEach(s=>{
+    const nm=s.nome||('Série '+s.n);
+    const d=g(K,achar(mets,'divida.*'+nm,'saldo devedor.*'+nm));
+    if(d!=null){div[nm]=d; if(gar!=null&&d>0)ilg[nm]=gar/d;}
+  });
+  // sem garantias explícitas: usa a métrica de liquidez reportada pelo servicer
+  (e.series||[]).forEach(s=>{const nm=s.nome||('Série '+s.n);
+    if(ilg[nm]==null){const f=g(K,achar(Object.keys(K),'(liquidez|ilg).*'+nm));if(f!=null)ilg[nm]=f;}});
+  // LTV = dívida da 1ª série (sênior) ÷ garantias; fallback: métrica pronta
+  const s1=(e.series||[])[0]; const d1=s1?div[s1.nome||('Série '+s1.n)]:null;
+  const ltv=(gar>0&&d1>0)? d1/gar : g(K,achar(mets,'^ltv'));
+  return {gar,ilg,ltv,div};
+}
+function statusDir(v, r, defVerde, defAm, dir){
+  if(v==null)return 'S/ DADO';
+  const ve=r?r.verde:defVerde, am=r?r.amarelo:defAm, d=r?r.dir:dir;
+  if(d==='<=')return v<=ve?'VERDE':(am!=null&&v<=am?'AMARELO':'VERMELHO');
+  return v>=ve?'VERDE':(am!=null&&v>=am?'AMARELO':'VERMELHO');
+}
+function farol(e, m){
+  const out=[]; const rt=ratios(e,m);
+  Object.entries(rt.ilg).forEach(([nm,v])=>{
+    out.push({ind:'ILG '+nm, txt:v!=null?fmt(v,2)+'x':'—',
+      status:statusDir(v, regra(e,'ilg.*'+nm,'liquidez.*'+nm), 1.2, 1.0, '>=')});
+  });
+  out.push({ind:'LTV', txt:rt.ltv!=null?fmt(rt.ltv*100,0)+'%':'—',
+    status:statusDir(rt.ltv, regra(e,'ltv'), .75, .9, '<=')});
+  const rec=(e._recebMes||{})[m]||null, esp=(e.receber_prev||{})[m]||null;
+  const raz=(rec!=null&&esp>0)?rec/esp:null;
+  out.push({ind:'Carteira do mês', txt:(rec!=null?fBRL(rec):'—')+(esp?' / '+fBRL(esp)+' esp.':''),
+    extra:raz!=null?fmt(raz*100,0)+'% do esperado':null,
+    status:esp?statusDir(raz, regra(e,'carteira'), .8, .5, '>='):(rec!=null?'S/ DADO':'S/ DADO')});
+  return out;
+}
+function nivelRisco(fs){
+  const st=fs.map(f=>f.status);
+  if(st.includes('VERMELHO'))return 2;
+  if(st.includes('AMARELO'))return 1;
+  if(st.every(s=>s==='S/ DADO'))return -1;
+  return 0;
+}
+const NIVEL={'-1':['S/ DADO','#9AA6A0'],0:['POUCO RISCO','#155446'],1:['RISCO MÉDIO','#B9892F'],2:['RISCO ALTO','#B3402E']};
+function gauge(nivel, size=120){
+  const ang=nivel<0?0:(nivel===0?-52:nivel===1?0:52);
+  const [lab,cor]=NIVEL[nivel];
+  const h=size*.62;
+  return `<svg width="${size}" height="${h}" viewBox="0 0 120 74">
+    <path d="M12 66 A48 48 0 0 1 44 21" fill="none" stroke="#155446" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+    <path d="M48 19 A48 48 0 0 1 72 19" fill="none" stroke="#B9892F" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+    <path d="M76 21 A48 48 0 0 1 108 66" fill="none" stroke="#B3402E" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+    <g transform="rotate(${ang} 60 66)"><line x1="60" y1="66" x2="60" y2="30" stroke="${cor}" stroke-width="4" stroke-linecap="round"/></g>
+    <circle cx="60" cy="66" r="6" fill="${cor}"/>
+  </svg><div class="glab" style="color:${cor}">${lab}</div>`;
+}
+function prep(e){ // caches derivados
+  e._recebMes={}; (e.receb||[]).forEach(r=>{const m=r.d.slice(0,7);e._recebMes[m]=(e._recebMes[m]||0)+r.v});
+  e._meses=Object.keys(e.kpi||{}).sort();
 }
 function kpiCard(lab,val,prev,fm){
   let cls='',txt='—';
@@ -159,106 +245,113 @@ function mk(id,type,data,opts){
     options:Object.assign({responsive:true,maintainAspectRatio:false,animation:false,
     plugins:Object.assign({legend:{position:'top',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}}},(opts||{}).plugins||{})},opts||{})});
 }
-function nav(v, id){
+function nav(v,id){
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
-  if(v==='port'){ document.querySelector('[data-view="port"]').classList.add('active');
-    document.getElementById('view-port').style.display='block';
-    document.getElementById('view-emis').style.display='none'; }
-  else { const b=document.querySelector(`[data-emis="${id}"]`); if(b)b.classList.add('active');
-    document.getElementById('view-port').style.display='none';
-    document.getElementById('view-emis').style.display='block';
-    abrir(id); }
+  if(v==='port'){document.querySelector('[data-view="port"]').classList.add('active');
+    document.getElementById('view-port').style.display='block';document.getElementById('view-emis').style.display='none';renderPort();}
+  else{const b=document.querySelector(`[data-emis="${id}"]`);if(b)b.classList.add('active');
+    document.getElementById('view-port').style.display='none';document.getElementById('view-emis').style.display='block';abrir(id);}
 }
-function farolGeral(e){
-  const meses=Object.keys(e.kpi).sort(); const last=meses[meses.length-1];
-  const fh=(e.farol_hist||{})[last]||[];
-  if(fh.some(f=>f.status==='VERMELHO'))return 'VERMELHO';
-  if(fh.some(f=>f.status==='AMARELO'))return 'AMARELO';
-  if(fh.length&&fh.every(f=>f.status==='S/ DADO'))return 'S/ DADO';
-  return fh.length?'VERDE':'S/ DADO';
+function renderNav(){
+  document.getElementById('navemis').innerHTML=DB.emissoes.map(e=>{
+    const last=e._meses[e._meses.length-1];
+    const nv=last?nivelRisco(farol(e,last)):-1;
+    return `<button class="nav-btn" data-emis="${e.id}" onclick="nav('emis','${e.id}')">`+
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>${e.nome}`+
+      `<span class="fdot" style="background:${NIVEL[nv][1]}"></span></button>`;}).join('');
 }
-const fdotColor={'VERDE':'#4CC38A','AMARELO':'#B9892F','VERMELHO':'#E5484D','S/ DADO':'#9AA6A0'};
-
 function renderPort(){
   const es=DB.emissoes;
-  document.getElementById('port-sub').textContent = es.length+' emissões monitoradas · base de '+DB.gerado.replace('T',' ');
-  let sdTot=0, recTot=0, alertas=0, comDado=0;
-  es.forEach(e=>{
-    const meses=Object.keys(e.kpi).sort(); const last=meses[meses.length-1];
-    const mets=Object.keys(e.kpi[last]||{});
-    const mSD=achar(mets,'saldo devedor.*s[êe]nior','saldo devedor');
-    if(mSD!=null&&g(e.kpi[last],mSD)!=null){sdTot+=g(e.kpi[last],mSD);comDado++}
-    e.receb.forEach(r=>{ if(r.d.slice(0,7)===last) recTot+=r.v });
-    const st=farolGeral(e); if(st==='AMARELO'||st==='VERMELHO')alertas++;
-  });
-  document.getElementById('port-kpis').innerHTML =
-    kpiCard('Emissões', es.length, null, v=>fmt(v))+
-    kpiCard('Saldo devedor sênior (soma)', comDado?sdTot:null, null, fBRL)+
-    kpiCard('Recebido no último mês (soma)', recTot||null, null, fBRL)+
-    kpiCard('Emissões em alerta', alertas, null, v=>fmt(v));
-  document.getElementById('port-cards').innerHTML = es.map(e=>{
-    const meses=Object.keys(e.kpi).sort(); const last=meses[meses.length-1];
-    const mets=Object.keys(e.kpi[last]||{});
-    const mSD=achar(mets,'saldo devedor.*s[êe]nior','saldo devedor');
-    const st=farolGeral(e);
-    const fh=((e.farol_hist||{})[last]||[]).map(f=>`<span class="badge ${bcls[f.status]||'n'}" title="${f.indicador}: ${fVal(f.valor,f.formato)}">${f.indicador.split('—')[0].trim()}</span>`).join('');
-    return `<div class="kcard" style="border-left-color:${fdotColor[st]}" onclick="nav('emis','${e.id}')">
-      <div class="t">${e.titulo} ${e.nome}</div>
-      <div class="m">Último mês: ${last?mmYY(last):'—'} · ${Object.keys(e.kpi).length} safras na base</div>
-      <div class="v">${mSD?fBRL(g(e.kpi[last],mSD)):'—'} <span style="font-size:11px;color:var(--ink-2);font-family:'IBM Plex Sans'">saldo devedor</span></div>
-      <div class="fx">${fh||'<span class="badge n">sem farol</span>'}</div></div>`;
-  }).join('');
+  document.getElementById('port-sub').textContent=es.length+' emissões monitoradas · base de '+(DB.gerado||'—').replace('T',' ');
+  let recTot=0, alertas=0;
+  es.forEach(e=>{const last=e._meses[e._meses.length-1];
+    recTot+=(e._recebMes||{})[last]||0;
+    const nv=last?nivelRisco(farol(e,last)):-1; if(nv>0)alertas++;});
+  document.getElementById('port-kpis').innerHTML=
+    kpiCard('Emissões',es.length,null,v=>fmt(v))+
+    kpiCard('Recebido no último mês (soma)',recTot||null,null,fBRL)+
+    kpiCard('Emissões em alerta',alertas,null,v=>fmt(v));
+  document.getElementById('port-cards').innerHTML=es.map(e=>{
+    const last=e._meses[e._meses.length-1];
+    const fs=last?farol(e,last):[]; const nv=last?nivelRisco(fs):-1;
+    const rt=last?ratios(e,last):{ilg:{}};
+    const ilg1=Object.values(rt.ilg)[0];
+    const rec=(e._recebMes||{})[last], esp=(e.receber_prev||{})[last];
+    return `<div class="kcard" onclick="nav('emis','${e.id}')">
+      <div class="gz">${gauge(nv)}</div>
+      <div class="info">
+        <div class="t">${e.nome}</div>
+        <div class="m">${e.titulo} · último mês ${last?mmYY(last):'—'} · ${e._meses.length} safras</div>
+        <div class="mini">
+          <div class="mi"><div class="k">ILG</div><div class="v">${ilg1!=null?fmt(ilg1,2)+'x':'—'}</div></div>
+          <div class="mi"><div class="k">LTV</div><div class="v">${rt.ltv!=null?fmt(rt.ltv*100,0)+'%':'—'}</div></div>
+          <div class="mi"><div class="k">Carteira</div><div class="v">${rec!=null?fBRL(rec):'—'}${esp?'<span style="font-size:9px;color:var(--ink-2)"> /'+fBRL(esp)+'</span>':''}</div></div>
+        </div>
+      </div></div>`;}).join('');
 }
-
 function abrir(id){
   CUR=DB.emissoes.find(e=>e.id===id); if(!CUR)return;
   document.getElementById('e-tt').textContent=CUR.titulo+' '+CUR.nome;
-  document.getElementById('e-sub').textContent='Lâmina dinâmica · arquivo: '+CUR.arquivo;
-  const meses=Object.keys(CUR.kpi).sort();
+  document.getElementById('e-sub').textContent='Lâmina dinâmica · '+CUR.arquivo;
   const sel=document.getElementById('selm'); sel.innerHTML='';
-  meses.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=mmYY(m);sel.appendChild(o)});
-  sel.value=meses[meses.length-1];
+  CUR._meses.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=mmYY(m);sel.appendChild(o)});
+  sel.value=CUR._meses[CUR._meses.length-1];
   RE();
 }
+const OCULTAR=[/^inad /i, /^\([a-m]\)/i, /^\(j\//i, /^ltv/i, /liquidez|ilg/i];
 function RE(){
   const e=CUR; if(!e)return;
-  const meses=Object.keys(e.kpi).sort();
-  const m=document.getElementById('selm').value, i=meses.indexOf(m), mp=i>0?meses[i-1]:null;
+  const meses=e._meses, m=document.getElementById('selm').value, i=meses.indexOf(m), mp=i>0?meses[i-1]:null;
   const K=e.kpi[m]||{}, P=mp?e.kpi[mp]:{};
   const mets=[...new Set(meses.flatMap(mm=>Object.keys(e.kpi[mm]||{})))];
-  const recebMes={}; e.receb.forEach(r=>{const mm=r.d.slice(0,7);recebMes[mm]=(recebMes[mm]||0)+r.v});
   // farol
-  const fh=(e.farol_hist||{})[m]||[];
-  document.getElementById('e-farol').innerHTML='<h3>Farol de risco <span class="hint">enquadramento no mês</span></h3>'+
-    (fh.length? fh.map(f=>`<span class="badge ${bcls[f.status]||'n'}" style="margin-right:8px;margin-bottom:6px">${f.indicador}: ${fVal(f.valor,f.formato)} · ${f.status}</span>`).join('') : '<span class="badge n">Nenhuma regra de farol configurada na Config</span>');
-  // KPIs principais por heurística (funciona para qualquer emissão)
-  const mSD=achar(mets,'saldo devedor.*s[êe]nior','saldo devedor');
-  const mVP=achar(mets,'vp carteira.*s[êe]nior','vp carteira','valor presente');
-  const mIN=achar(mets,'inadimpl','em aberto vencido');
-  const mIL=achar(mets,'liquidez.*s[êe]nior','ilg.*s[êe]nior','liquidez','ilg');
-  const mES=achar(mets,'estoque');
-  document.getElementById('e-kpis').innerHTML =
-    (mSD?kpiCard(mSD,g(K,mSD),g(P,mSD),fBRL):'')+
-    (mVP?kpiCard(mVP,g(K,mVP),g(P,mVP),fBRL):'')+
-    kpiCard('Recebido no mês',recebMes[m]||null,mp?recebMes[mp]:null,fBRL)+
-    (mIN?kpiCard(mIN,g(K,mIN),g(P,mIN),fBRL):'')+
-    (mIL?kpiCard(mIL,g(K,mIL),g(P,mIL),v=>v==null?'—':fmt(v,2)+'x'):'')+
-    (mES?kpiCard(mES,g(K,mES),g(P,mES),fBRL):'');
+  const fs=farol(e,m); const nv=nivelRisco(fs);
+  document.getElementById('e-farol').innerHTML=
+    `<div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <div style="text-align:center">${gauge(nv,110)}</div>
+      <div style="flex:1;min-width:260px"><h3 style="margin-bottom:8px">Farol de risco <span class="hint">ILG · LTV · carteira — calculados pelo sistema</span></h3>
+      ${fs.map(f=>`<span class="badge ${bcls[f.status]||'n'}">${f.ind}: ${f.txt}${f.extra?' · '+f.extra:''} · ${f.status}</span>`).join('')}</div></div>`;
+  // KPIs
+  const mSD=achar(mets,'saldo devedor.*s[êe]nior','d[íi]vida.*s[êe]nior','saldo devedor');
+  const mVP=achar(mets,'vp carteira.*s[êe]nior','vp carteira','vp receb','garantia');
+  const mIN=achar(mets,'inadimpl.*r\\$','inadimpl','em aberto vencido');
+  const mES=achar(mets,'estoque.*r\\$','^\\(b\\) valor de estoque','estoque');
+  document.getElementById('e-kpis').innerHTML=
+    (mSD?kpiCard('Saldo devedor sênior',g(K,mSD),g(P,mSD),fBRL):'')+
+    (mVP?kpiCard(mVP.replace(/^\([A-M]\)\s*/,''),g(K,mVP),g(P,mVP),fBRL):'')+
+    kpiCard('Recebido no mês',(e._recebMes||{})[m]||null,mp?(e._recebMes||{})[mp]:null,fBRL)+
+    (mIN?kpiCard('Inadimplência',g(K,mIN),g(P,mIN),fBRL):'')+
+    (mES?kpiCard('Estoque',g(K,mES),g(P,mES),fBRL):'');
+  // fluxo do investidor + payback
+  const mIn={}; (e.integ||[]).forEach(x=>{const mm=x.d.slice(0,7);mIn[mm]=(mIn[mm]||0)+x.v});
+  const mOut=e.pag_cri||{};
+  const fm=[...new Set([...Object.keys(mIn),...Object.keys(mOut)])].sort();
+  let acc2=0; const cum=fm.map(mm=>{acc2+=(mOut[mm]||0)-(mIn[mm]||0);return acc2});
+  const pb=fm.find((mm,j)=>cum[j]>=0);
+  document.getElementById('pb-hint').textContent='aportes × retornos · '+(pb?('payback em '+mmYY(pb)):'payback não atingido');
+  mk('ch_fluxo','bar',{labels:fm.map(mmYY),datasets:[
+    {label:'Aportes',data:fm.map(mm=>-(mIn[mm]||0)),backgroundColor:'#B9892FCC',borderRadius:3},
+    {label:'Pagamentos ao CRI',data:fm.map(mm=>mOut[mm]||0),backgroundColor:'#155446CC',borderRadius:3},
+    {type:'line',label:'Acumulado',data:cum,borderColor:'#2D5C8A',borderWidth:2,tension:.25,pointRadius:2}]},
+    {scales:{y:{ticks:{callback:v=>fBRL(v)}},x:{stacked:true}}});
+  // razões de garantia (linha do tempo)
+  const rz=meses.map(mm=>ratios(e,mm));
+  const nomesIlg=[...new Set(rz.flatMap(r=>Object.keys(r.ilg)))];
+  mk('ch_razoes','line',{labels:meses.map(mmYY),datasets:[
+    ...nomesIlg.map((nm,j)=>({label:'ILG '+nm,data:rz.map(r=>r.ilg[nm]??null),borderColor:CORES[j],backgroundColor:CORES[j]+'22',borderWidth:2,tension:.25,spanGaps:true})),
+    {label:'LTV',data:rz.map(r=>r.ltv??null),borderColor:'#B3402E',borderDash:[6,4],borderWidth:2,tension:.25,spanGaps:true}]},
+    {scales:{y:{ticks:{callback:v=>fmt(v,2)}}}});
   // recebimentos diários
-  const rd=e.receb.filter(r=>r.d.slice(0,7)===m);
+  const rd=(e.receb||[]).filter(r=>r.d.slice(0,7)===m);
   mk('ch_receb','bar',{labels:rd.map(r=>r.d.slice(8)),datasets:[{label:'R$/dia',data:rd.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4}]},
      {plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)}}}});
-  // evolução: métricas de saldo/VP encontradas (até 4)
-  const evoM=mets.filter(k=>/saldo devedor|vp carteira|valor presente/i.test(k)).slice(0,4);
-  mk('ch_evo','line',{labels:meses.map(mmYY),datasets:evoM.map((k,j)=>({label:k,data:meses.map(mm=>g(e.kpi[mm],k)),borderColor:CORES[j],backgroundColor:CORES[j]+'22',tension:.3,borderWidth:2,spanGaps:true}))},
-     {scales:{y:{ticks:{callback:v=>fBRL(v)}}}});
-  // aging: métricas que começam com "Inad "
+  // aging
   const bl=mets.filter(k=>/^inad /i.test(k));
   mk('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:bl.map(b=>g(K,b)),backgroundColor:CORES.map(c=>c+'CC'),borderRadius:4}]},
      {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}});
   // obra
-  const ob=e.obra||[];
-  let acc=0; const obAcc=ob.map(o=>{acc+=o.pct;return {m:o.m,acc:Math.min(acc,1),med:o.med}});
+  const ob=e.obra||[]; let acc=0;
+  const obAcc=ob.map(o=>{acc+=o.pct;return{m:o.m,acc:Math.min(acc,1),med:o.med}});
   const cur=obAcc.filter(o=>o.m<=m).slice(-1)[0]||obAcc.slice(-1)[0];
   const pctA=cur?cur.acc:0;
   document.getElementById('obra_bar').style.width=(pctA*100).toFixed(1)+'%';
@@ -267,37 +360,109 @@ function RE(){
      {type:'line',label:'% acumulado',data:obAcc.map(o=>o.acc*100),yAxisID:'y1',borderColor:'#B3402E',borderWidth:2,tension:.3},
      {label:'Medição (R$)',data:ob.map(o=>o.med),backgroundColor:'#155446CC',borderRadius:4}]},
      {scales:{y:{ticks:{callback:v=>fmt(v)}},y1:{position:'right',min:0,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}}}});
-  // características + séries
+  // características + séries + players (mesmo quadro)
   let hc='<table><thead><tr><th colspan="2">Características da emissão</th></tr></thead><tbody>';
   (e.carac||[]).forEach(c=>{hc+=`<tr><td>${c.k}</td><td class="r mono">${typeof c.v==='number'?fmt(c.v,2):c.v}</td></tr>`});
-  (e.series||[]).forEach(s=>{hc+=`<tr><td>Série ${s.n} — ${s.nome||''}</td><td class="r mono">${s.taxa!=null?fmt(s.taxa*100,2)+'% a.a.':'—'}</td></tr>`});
+  (e.series||[]).forEach(s=>{hc+=`<tr><td>Taxa — Série ${s.n} (${s.nome||''})</td><td class="r mono">${s.taxa!=null?fmt(s.taxa*100,2)+'% a.a.':'—'}</td></tr>`});
+  (e.players||[]).forEach(p=>{hc+=`<tr><td>${p.papel}</td><td class="r">${p.nome}</td></tr>`});
   document.getElementById('e-carac').innerHTML=hc+'</tbody></table>';
-  // histórico do farol
-  let hf='<table><thead><tr><th>Farol — histórico</th>'+meses.map(mm=>`<th class="r">${mmYY(mm)}</th>`).join('')+'</tr></thead><tbody>';
-  (e.farol||[]).forEach(f=>{
-    hf+=`<tr><td>${f.indicador}</td>`+meses.map(mm=>{
-      const x=((e.farol_hist||{})[mm]||[]).find(y=>y.indicador===f.indicador);
-      return `<td class="r"><span class="badge ${bcls[(x||{}).status]||'n'}">${x?fVal(x.valor,x.formato):'—'}</span></td>`;
-    }).join('')+'</tr>'});
-  document.getElementById('e-farolhist').innerHTML=hf+'</tbody></table>';
-  // tabela completa
+  // tabela filtrada (sem Inad, letras A..M, razões — já mostradas em gráfico/farol)
+  const vis=TOGGLE_ALL?mets:mets.filter(k=>!OCULTAR.some(re=>re.test(k)));
+  document.getElementById('btn-all').textContent=TOGGLE_ALL?'mostrar só as principais':'mostrar todas as métricas';
   let h='<table><thead><tr><th>Métrica</th>'+meses.map(mm=>`<th class="r">${mmYY(mm)}</th>`).join('')+'</tr></thead><tbody>';
-  mets.sort().forEach(k=>{h+=`<tr><td>${k}</td>`+meses.map(mm=>`<td class="r mono">${fmt(g(e.kpi[mm],k),2)}</td>`).join('')+'</tr>'});
-  h+=`<tr><td><b>Recebido no mês (conta)</b></td>`+meses.map(mm=>`<td class="r mono"><b>${fmt(recebMes[mm],2)}</b></td>`).join('')+'</tr>';
+  vis.sort().forEach(k=>{h+=`<tr><td>${k}</td>`+meses.map(mm=>`<td class="r mono">${fmt(g(e.kpi[mm],k),2)}</td>`).join('')+'</tr>'});
+  h+=`<tr><td><b>Recebido no mês (conta)</b></td>`+meses.map(mm=>`<td class="r mono"><b>${fmt((e._recebMes||{})[mm],2)}</b></td>`).join('')+'</tr>';
   document.getElementById('e-tbl').innerHTML=h+'</tbody></table>';
 }
-
+// ============ UPLOAD DE CONSOLIDADO (.xlsx) NO NAVEGADOR ============
+function CL(l){return XLSX.utils.decode_col(l)} // letra -> 0-based
+function V(ws,r,c){const cell=ws[XLSX.utils.encode_cell({r:r-1,c:c-1})];return cell?cell.v:null}
+function isDate(x){return x instanceof Date&&!isNaN(x)}
+function dstr(x){const p=n=>String(n).padStart(2,'0');return x.getFullYear()+'-'+p(x.getMonth()+1)+'-'+p(x.getDate())}
+function numJS(x){if(typeof x==='number')return x;
+  if(typeof x==='string'){const t=x.trim().replace(/[\s ]/g,'').replace(/\./g,'').replace(',','.');const f=parseFloat(t);return isNaN(f)?null:f}
+  return null}
+function parseConsolidado(wbk, fname){
+  const S=wbk.Sheets;
+  if(!S['_SCHEMA'])throw 'sem aba _SCHEMA (não é consolidado padrão)';
+  let js=''; for(let r=2;r<3000;r++){const v=V(S['_SCHEMA'],r,1); if(v==null)break; js+=v;}
+  const sc=JSON.parse(js);
+  const cfg=S['Config'];
+  const nome=V(cfg,3,2)||'Emissão', titulo=V(cfg,4,2)||'CRI';
+  const carac=[]; for(let r=3;r<15;r++){const k=V(cfg,r,1),v=V(cfg,r,2);
+    if(k!=null&&v!=null)carac.push({k:String(k),v:isDate(v)?dstr(v):(numJS(v)??String(v))})}
+  const series=[]; const srow=sc.cfg_series_row||18;
+  for(let i=0;i<(sc.n_series||1);i++){series.push({n:V(cfg,srow+i,1),nome:V(cfg,srow+i,2),taxa:numJS(V(cfg,srow+i,7))})}
+  const players=[]; if(sc.cfg_ops_row)for(let i=0;i<(sc.cfg_ops_n||0);i++){
+    const pa=V(cfg,sc.cfg_ops_row+i,1),qm=V(cfg,sc.cfg_ops_row+i,2);
+    if(pa&&qm)players.push({papel:String(pa),nome:String(qm)})}
+  const farol_regras=[]; if(sc.cfg_farol_row)for(let i=0;i<(sc.cfg_farol_n||0);i++){
+    const r=sc.cfg_farol_row+i, ind=V(cfg,r,1); if(!ind)continue;
+    farol_regras.push({indicador:String(ind),dir:String(V(cfg,r,3)||'>='),verde:numJS(V(cfg,r,4)),amarelo:numJS(V(cfg,r,5))})}
+  const kpi={}; if(S['BD_KPI'])for(let r=2;r<100000;r++){
+    const s=V(S['BD_KPI'],r,1); if(s==null)break;
+    const mnm=V(S['BD_KPI'],r,2), v=numJS(V(S['BD_KPI'],r,3));
+    if(isDate(s)&&mnm&&v!=null){const mm=dstr(s).slice(0,7);(kpi[mm]=kpi[mm]||{})[String(mnm)]=v}}
+  const receb=[], pag_cri={}; const flags=(sc.c||{}).flags||{};
+  const fc=Object.keys(flags).find(k=>/carteira/i.test(k)), fp=Object.keys(flags).find(k=>/pagamento cri/i.test(k));
+  if(S['C']&&(fc||fp))for(let r=sc.c.first_row;r<sc.c.first_row+1200;r++){
+    const d=V(S['C'],r,1); if(!isDate(d))continue; const val=numJS(V(S['C'],r,5)); if(val==null)continue;
+    if(fc&&V(S['C'],r,CL(flags[fc])+1)===1)receb.push({d:dstr(d),v:val});
+    if(fp&&V(S['C'],r,CL(flags[fp])+1)===1){const mm=dstr(d).slice(0,7);pag_cri[mm]=(pag_cri[mm]||0)+Math.abs(val)}}
+  const integ=[]; const it=sc.integ||{first_row:3,rows:300};
+  const IS=S['Integralização']||S['Integralizacao'];
+  if(IS)for(let r=it.first_row;r<it.first_row+it.rows;r++){
+    const d=V(IS,r,2),q=numJS(V(IS,r,4)),se=V(IS,r,6),pu=numJS(V(IS,r,7));
+    if(isDate(d)&&q&&pu)integ.push({d:dstr(d),serie:se,v:q*pu})}
+  const receber_prev={}; if(S['BD_Receber']){
+    const ref=XLSX.utils.decode_range(S['BD_Receber']['!ref']||'A1');
+    let cd=null,cv=null,crel=null;
+    for(let c=0;c<=ref.e.c;c++){const h=String(V(S['BD_Receber'],1,c+1)||'');
+      if(crel==null&&/relat/i.test(h))crel=c+1;
+      if(cd==null&&/venc/i.test(h))cd=c+1; if(cv==null&&/valor/i.test(h))cv=c+1;}
+    if(cd&&cv)for(let r=2;r<=ref.e.r+1;r++){const d=V(S['BD_Receber'],r,cd),v=numJS(V(S['BD_Receber'],r,cv));
+      if(!isDate(d)||!v)continue;
+      if(crel){const rel=V(S['BD_Receber'],r,crel);
+        if(!isDate(rel)||rel.getFullYear()!==d.getFullYear()||rel.getMonth()!==d.getMonth())continue;}
+      const mm=dstr(d).slice(0,7);receber_prev[mm]=(receber_prev[mm]||0)+v}}
+  const obra=[]; const ob=sc.obra;
+  if(ob&&S['Obra'])for(let r=ob.first_row;r<ob.first_row+ob.rows;r++){
+    const mmv=V(S['Obra'],r,CL(ob.cols.mes||'A')+1);
+    const pc=numJS(V(S['Obra'],r,CL(ob.cols.pct||'B')+1)), md=numJS(V(S['Obra'],r,CL(ob.cols.medicao||'E')+1));
+    if(isDate(mmv)&&(pc!=null||md!=null))obra.push({m:dstr(mmv).slice(0,7),pct:pc||0,med:md||0})}
+  const id=(titulo+'_'+nome).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  return {id,nome:String(nome),titulo:String(titulo),arquivo:fname,gerado:new Date().toISOString().slice(0,10),
+    carac,series,players,kpi,receb,pag_cri,integ,receber_prev,obra,
+    orcamento:numJS(V(cfg,9,2))||0,farol_regras};
+}
+function carregarArquivos(files){
+  [...files].forEach(f=>{
+    const rd=new FileReader();
+    rd.onload=ev=>{try{
+      const wbk=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      const e=parseConsolidado(wbk,f.name); prep(e);
+      const ix=DB.emissoes.findIndex(x=>x.id===e.id);
+      if(ix>=0)DB.emissoes[ix]=e; else DB.emissoes.push(e);
+      renderNav(); nav('emis',e.id);
+      const b=document.getElementById('banner');b.style.display='block';
+      b.innerHTML=`<b>${e.titulo} ${e.nome}</b> carregado (somente nesta sessão). Para gravar no banco: <code>python atualizar_dados.py</code> e publique o dados.json.`;
+      document.getElementById('err').style.display='none';
+    }catch(x){alert('Falha ao ler '+f.name+': '+x)}};
+    rd.readAsArrayBuffer(f);
+  });
+}
+document.getElementById('file').addEventListener('change',ev=>carregarArquivos(ev.target.files));
+let dragN=0;
+window.addEventListener('dragenter',e=>{e.preventDefault();dragN++;document.getElementById('drop-ov').style.display='flex'});
+window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragN<=0){dragN=0;document.getElementById('drop-ov').style.display='none'}});
+window.addEventListener('dragover',e=>e.preventDefault());
+window.addEventListener('drop',e=>{e.preventDefault();dragN=0;document.getElementById('drop-ov').style.display='none';
+  if(e.dataTransfer.files.length)carregarArquivos(e.dataTransfer.files)});
+// ============ BOOT ============
 fetch('dados.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(db=>{
-  DB=db;
+  DB=db; DB.emissoes.forEach(prep);
   document.getElementById('sync-txt').textContent='base de '+db.gerado.replace('T',' ');
-  const nav_=document.getElementById('navemis');
-  nav_.innerHTML=db.emissoes.map(e=>{
-    const st=farolGeral(e);
-    return `<button class="nav-btn" data-emis="${e.id}" onclick="nav('emis','${e.id}')">`+
-      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>${e.nome}`+
-      `<span class="fdot" style="background:${fdotColor[st]}"></span></button>`;
-  }).join('');
-  renderPort();
+  renderNav(); renderPort();
 }).catch(()=>{
   document.getElementById('err').style.display='block';
   document.getElementById('view-port').style.display='none';
