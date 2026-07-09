@@ -32,6 +32,7 @@ aside{width:238px;min-height:100vh;background:var(--side);color:var(--side-ink);
 .side-foot{margin-top:auto;font-size:11px;color:#5F7A6E;padding:10px;border-top:1px solid rgba(255,255,255,.08)}
 .sync{display:flex;align-items:center;gap:7px;font-size:11px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.05);margin-top:10px}
 .sync .dot{width:8px;height:8px;border-radius:99px;background:#4CC38A;flex-shrink:0}
+.sync.warn .dot{background:var(--gold)}
 .sync.err .dot{background:#E5484D}
 .upl{display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 10px;border:1px dashed rgba(255,255,255,.25);border-radius:8px;background:none;color:var(--side-ink);font:inherit;font-size:12px;width:100%;cursor:pointer}
 .upl:hover{background:rgba(255,255,255,.06);color:#fff}
@@ -55,6 +56,9 @@ label.flbl{font-size:12px;color:var(--ink-2)}
 .charts2{grid-template-columns:1fr 1fr}
 @media(max-width:1100px){.charts2{grid-template-columns:1fr}.cards2{grid-template-columns:1fr}}
 .chartbox{position:relative;height:250px}
+.chartbox canvas{width:100%;height:100%}
+.empty{min-height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-2);background:#FBFAF7;border:1px dashed var(--line);border-radius:8px;padding:18px;font-size:12.5px;line-height:1.35}
+.tablewrap .empty{min-height:220px;border:0;border-radius:var(--r);background:#fff}
 .sp{height:14px}
 .tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -83,6 +87,11 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
 .bar>div{height:100%;background:linear-gradient(90deg,var(--green),#1E7A63);border-radius:10px}
 .bar span{position:absolute;left:50%;top:0;transform:translateX(-50%);font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--ink);line-height:20px}
 #banner{display:none;max-width:100%;margin-bottom:14px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;font-size:12.5px}
+#banner.ok{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+#banner.err{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.load-panel{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px dashed var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+.load-title{font-family:'Archivo',sans-serif;font-weight:700;font-size:13px}
+.load-meta{font-size:12px;color:var(--ink-2);margin-top:2px}
 #err{max-width:640px;margin:60px auto;background:var(--red-soft);border:1px solid var(--red);border-radius:10px;padding:24px;display:none}
 #err h2{color:var(--red);margin-bottom:8px}
 #err code{background:#fff;padding:2px 6px;border-radius:4px;font-size:12px}
@@ -110,6 +119,10 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
 
 <section class="view" id="view-port" style="display:block">
   <div class="topbar"><div><h1>Portfólio de CRIs</h1><div class="sub" id="port-sub">—</div></div></div>
+  <div class="load-panel" id="load-panel">
+    <div><div class="load-title">Consolidado mensal</div><div class="load-meta" id="load-meta">Base: dados.json</div></div>
+    <button class="btn" onclick="document.getElementById('file').click()">Carregar .xlsx</button>
+  </div>
   <div class="grid kpis" id="port-kpis"></div>
   <div class="sp"></div>
   <div class="grid cards2" id="port-cards"></div>
@@ -240,10 +253,45 @@ function kpiCard(lab,val,prev,fm){
   return `<div class="card kpi"><div class="lbl">${lab}</div><div class="val">${fm(val)}</div><div class="delta ${cls}">${txt}</div></div>`;
 }
 function mk(id,type,data,opts){
+  clearEmpty(id);
   if(CH[id])CH[id].destroy();
   CH[id]=new Chart(document.getElementById(id).getContext('2d'),{type,data,
     options:Object.assign({responsive:true,maintainAspectRatio:false,animation:false,
     plugins:Object.assign({legend:{position:'top',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}}},(opts||{}).plugins||{})},opts||{})});
+}
+function temDadosGrafico(data){
+  return data && (data.labels||[]).length && (data.datasets||[]).some(ds=>
+    (ds.data||[]).some(v=>v!=null && !Number.isNaN(Number(v))));
+}
+function clearEmpty(id){
+  const c=document.getElementById(id); if(!c)return;
+  c.style.display='block';
+  const ph=c.parentElement.querySelector('.empty'); if(ph)ph.remove();
+}
+function chartEmpty(id,msg){
+  if(CH[id]){CH[id].destroy(); delete CH[id];}
+  const c=document.getElementById(id); if(!c)return;
+  c.style.display='none';
+  let ph=c.parentElement.querySelector('.empty');
+  if(!ph){ph=document.createElement('div'); ph.className='empty'; c.parentElement.appendChild(ph);}
+  ph.textContent=msg;
+}
+function mkSafe(id,type,data,opts,msg){
+  if(!temDadosGrafico(data)){chartEmpty(id,msg); return;}
+  mk(id,type,data,opts);
+}
+function setBanner(html,cls=''){
+  const b=document.getElementById('banner');
+  b.className=cls; b.style.display='block'; b.innerHTML=html;
+}
+function setSync(txt,cls=''){
+  const s=document.getElementById('sync');
+  s.classList.remove('err','warn');
+  if(cls)s.classList.add(cls);
+  document.getElementById('sync-txt').textContent=txt;
+}
+function setLoadMeta(txt){
+  const el=document.getElementById('load-meta'); if(el)el.textContent=txt;
 }
 function nav(v,id){
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
@@ -263,6 +311,12 @@ function renderNav(){
 function renderPort(){
   const es=DB.emissoes;
   document.getElementById('port-sub').textContent=es.length+' emissões monitoradas · base de '+(DB.gerado||'—').replace('T',' ');
+  setLoadMeta(es.length?('Base: '+(DB.gerado||'dados.json').replace('T',' ')+' · '+es.length+' emissões'):'Base sem emissões');
+  if(!es.length){
+    document.getElementById('port-kpis').innerHTML='';
+    document.getElementById('port-cards').innerHTML='<div class="empty" style="min-height:220px">Nenhuma emissão carregada.</div>';
+    return;
+  }
   let recTot=0, alertas=0;
   es.forEach(e=>{const last=e._meses[e._meses.length-1];
     recTot+=(e._recebMes||{})[last]||0;
@@ -329,26 +383,26 @@ function RE(){
   let acc2=0; const cum=fm.map(mm=>{acc2+=(mOut[mm]||0)-(mIn[mm]||0);return acc2});
   const pb=fm.find((mm,j)=>cum[j]>=0);
   document.getElementById('pb-hint').textContent='aportes × retornos · '+(pb?('payback em '+mmYY(pb)):'payback não atingido');
-  mk('ch_fluxo','bar',{labels:fm.map(mmYY),datasets:[
+  mkSafe('ch_fluxo','bar',{labels:fm.map(mmYY),datasets:[
     {label:'Aportes',data:fm.map(mm=>-(mIn[mm]||0)),backgroundColor:'#B9892FCC',borderRadius:3},
     {label:'Pagamentos ao CRI',data:fm.map(mm=>mOut[mm]||0),backgroundColor:'#155446CC',borderRadius:3},
     {type:'line',label:'Acumulado',data:cum,borderColor:'#2D5C8A',borderWidth:2,tension:.25,pointRadius:2}]},
-    {scales:{y:{ticks:{callback:v=>fBRL(v)}},x:{stacked:true}}});
+    {scales:{y:{ticks:{callback:v=>fBRL(v)}},x:{stacked:true}}},'Sem aportes ou pagamentos para exibir.');
   // razões de garantia (linha do tempo)
   const rz=meses.map(mm=>ratios(e,mm));
   const nomesIlg=[...new Set(rz.flatMap(r=>Object.keys(r.ilg)))];
-  mk('ch_razoes','line',{labels:meses.map(mmYY),datasets:[
+  mkSafe('ch_razoes','line',{labels:meses.map(mmYY),datasets:[
     ...nomesIlg.map((nm,j)=>({label:'ILG '+nm,data:rz.map(r=>r.ilg[nm]??null),borderColor:CORES[j],backgroundColor:CORES[j]+'22',borderWidth:2,tension:.25,spanGaps:true})),
     {label:'LTV',data:rz.map(r=>r.ltv??null),borderColor:'#B3402E',borderDash:[6,4],borderWidth:2,tension:.25,spanGaps:true}]},
-    {scales:{y:{ticks:{callback:v=>fmt(v,2)}}}});
+    {scales:{y:{ticks:{callback:v=>fmt(v,2)}}}},'Sem garantias, ILG ou LTV nesta emissão.');
   // recebimentos diários
   const rd=(e.receb||[]).filter(r=>r.d.slice(0,7)===m);
-  mk('ch_receb','bar',{labels:rd.map(r=>r.d.slice(8)),datasets:[{label:'R$/dia',data:rd.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4}]},
-     {plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)}}}});
+  mkSafe('ch_receb','bar',{labels:rd.map(r=>r.d.slice(8)),datasets:[{label:'R$/dia',data:rd.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4}]},
+     {plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)}}}},'Sem recebimentos registrados para o mês selecionado.');
   // aging
   const bl=mets.filter(k=>/^inad /i.test(k));
-  mk('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:bl.map(b=>g(K,b)),backgroundColor:CORES.map(c=>c+'CC'),borderRadius:4}]},
-     {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}});
+  mkSafe('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:bl.map(b=>g(K,b)),backgroundColor:CORES.map(c=>c+'CC'),borderRadius:4}]},
+     {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}},'Sem abertura de inadimplência para o mês selecionado.');
   // obra
   const ob=e.obra||[]; let acc=0;
   const obAcc=ob.map(o=>{acc+=o.pct;return{m:o.m,acc:Math.min(acc,1),med:o.med}});
@@ -356,19 +410,27 @@ function RE(){
   const pctA=cur?cur.acc:0;
   document.getElementById('obra_bar').style.width=(pctA*100).toFixed(1)+'%';
   document.getElementById('obra_pct').textContent=(pctA*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'% de '+fBRL(e.orcamento);
-  mk('ch_obra','bar',{labels:ob.map(o=>mmYY(o.m)),datasets:[
+  mkSafe('ch_obra','bar',{labels:ob.map(o=>mmYY(o.m)),datasets:[
      {type:'line',label:'% acumulado',data:obAcc.map(o=>o.acc*100),yAxisID:'y1',borderColor:'#B3402E',borderWidth:2,tension:.3},
      {label:'Medição (R$)',data:ob.map(o=>o.med),backgroundColor:'#155446CC',borderRadius:4}]},
-     {scales:{y:{ticks:{callback:v=>fmt(v)}},y1:{position:'right',min:0,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}}}});
+     {scales:{y:{ticks:{callback:v=>fmt(v)}},y1:{position:'right',min:0,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}}}},'Sem cronograma de obra no consolidado.');
   // características + séries + players (mesmo quadro)
-  let hc='<table><thead><tr><th colspan="2">Características da emissão</th></tr></thead><tbody>';
-  (e.carac||[]).forEach(c=>{hc+=`<tr><td>${c.k}</td><td class="r mono">${typeof c.v==='number'?fmt(c.v,2):c.v}</td></tr>`});
-  (e.series||[]).forEach(s=>{hc+=`<tr><td>Taxa — Série ${s.n} (${s.nome||''})</td><td class="r mono">${s.taxa!=null?fmt(s.taxa*100,2)+'% a.a.':'—'}</td></tr>`});
-  (e.players||[]).forEach(p=>{hc+=`<tr><td>${p.papel}</td><td class="r">${p.nome}</td></tr>`});
-  document.getElementById('e-carac').innerHTML=hc+'</tbody></table>';
+  if(!(e.carac||[]).length && !(e.series||[]).length && !(e.players||[]).length){
+    document.getElementById('e-carac').innerHTML='<div class="empty">Sem características cadastradas para esta emissão.</div>';
+  }else{
+    let hc='<table><thead><tr><th colspan="2">Características da emissão</th></tr></thead><tbody>';
+    (e.carac||[]).forEach(c=>{hc+=`<tr><td>${c.k}</td><td class="r mono">${typeof c.v==='number'?fmt(c.v,2):c.v}</td></tr>`});
+    (e.series||[]).forEach(s=>{hc+=`<tr><td>Taxa — Série ${s.n} (${s.nome||''})</td><td class="r mono">${s.taxa!=null?fmt(s.taxa*100,2)+'% a.a.':'—'}</td></tr>`});
+    (e.players||[]).forEach(p=>{hc+=`<tr><td>${p.papel}</td><td class="r">${p.nome}</td></tr>`});
+    document.getElementById('e-carac').innerHTML=hc+'</tbody></table>';
+  }
   // tabela filtrada (sem Inad, letras A..M, razões — já mostradas em gráfico/farol)
   const vis=TOGGLE_ALL?mets:mets.filter(k=>!OCULTAR.some(re=>re.test(k)));
   document.getElementById('btn-all').textContent=TOGGLE_ALL?'mostrar só as principais':'mostrar todas as métricas';
+  if(!vis.length && !meses.length){
+    document.getElementById('e-tbl').innerHTML='<div class="empty">Sem métricas mensais no consolidado carregado.</div>';
+    return;
+  }
   let h='<table><thead><tr><th>Métrica</th>'+meses.map(mm=>`<th class="r">${mmYY(mm)}</th>`).join('')+'</tr></thead><tbody>';
   vis.sort().forEach(k=>{h+=`<tr><td>${k}</td>`+meses.map(mm=>`<td class="r mono">${fmt(g(e.kpi[mm],k),2)}</td>`).join('')+'</tr>'});
   h+=`<tr><td><b>Recebido no mês (conta)</b></td>`+meses.map(mm=>`<td class="r mono"><b>${fmt((e._recebMes||{})[mm],2)}</b></td>`).join('')+'</tr>';
@@ -388,6 +450,7 @@ function parseConsolidado(wbk, fname){
   let js=''; for(let r=2;r<3000;r++){const v=V(S['_SCHEMA'],r,1); if(v==null)break; js+=v;}
   const sc=JSON.parse(js);
   const cfg=S['Config'];
+  if(!cfg)throw 'sem aba Config';
   const nome=V(cfg,3,2)||'Emissão', titulo=V(cfg,4,2)||'CRI';
   const carac=[]; for(let r=3;r<15;r++){const k=V(cfg,r,1),v=V(cfg,r,2);
     if(k!=null&&v!=null)carac.push({k:String(k),v:isDate(v)?dstr(v):(numJS(v)??String(v))})}
@@ -435,23 +498,50 @@ function parseConsolidado(wbk, fname){
     carac,series,players,kpi,receb,pag_cri,integ,receber_prev,obra,
     orcamento:numJS(V(cfg,9,2))||0,farol_regras};
 }
+function validarEmissao(e,fname){
+  if(/template|backup|teste/i.test(fname))throw 'arquivo identificado como template, backup ou teste';
+  const safras=Object.keys(e.kpi||{}).length;
+  const movimentos=(e.receb||[]).length+(e.integ||[]).length+Object.keys(e.pag_cri||{}).length+Object.keys(e.receber_prev||{}).length+(e.obra||[]).length;
+  if(!safras && !movimentos)throw 'consolidado sem safras ou movimentos para exibir';
+}
+function finalizarCarga(ok,err,last){
+  if(last){
+    DB.gerado=new Date().toISOString().slice(0,16);
+    document.getElementById('err').style.display='none';
+    renderNav(); nav('emis',last.id);
+  }else{
+    renderPort();
+  }
+  if(ok.length){
+    setSync('sessão atualizada · '+ok.length+' arquivo(s)', err.length?'warn':'');
+    setBanner(`<b>${ok.length} consolidado(s) carregado(s).</b>${err.length?' '+err.length+' arquivo(s) ignorado(s).':''}<br>${ok.join('<br>')}${err.length?'<br><br><b>Avisos</b><br>'+err.join('<br>'):''}`,'ok');
+  }else{
+    setSync('carga não aplicada','err');
+    setBanner(`<b>Nenhum consolidado foi carregado.</b><br>${err.join('<br>')}`,'err');
+  }
+  setLoadMeta('Base em sessão: '+(DB.gerado||'dados.json').replace('T',' ')+' · '+DB.emissoes.length+' emissões');
+}
 function carregarArquivos(files){
-  [...files].forEach(f=>{
+  const lista=[...files].filter(f=>/\.xlsx$/i.test(f.name));
+  if(!lista.length){setBanner('Selecione um arquivo .xlsx do consolidado padrão.','err');return;}
+  setSync('lendo consolidado...','warn');
+  setBanner('Lendo '+lista.length+' arquivo(s)...');
+  const ok=[], err=[]; let last=null, pend=lista.length;
+  lista.forEach(f=>{
     const rd=new FileReader();
     rd.onload=ev=>{try{
       const wbk=XLSX.read(ev.target.result,{type:'array',cellDates:true});
-      const e=parseConsolidado(wbk,f.name); prep(e);
+      const e=parseConsolidado(wbk,f.name); validarEmissao(e,f.name); prep(e);
       const ix=DB.emissoes.findIndex(x=>x.id===e.id);
       if(ix>=0)DB.emissoes[ix]=e; else DB.emissoes.push(e);
-      renderNav(); nav('emis',e.id);
-      const b=document.getElementById('banner');b.style.display='block';
-      b.innerHTML=`<b>${e.titulo} ${e.nome}</b> carregado (somente nesta sessão). Para gravar no banco: <code>python atualizar_dados.py</code> e publique o dados.json.`;
-      document.getElementById('err').style.display='none';
-    }catch(x){alert('Falha ao ler '+f.name+': '+x)}};
+      last=e; ok.push(`<b>${e.titulo} ${e.nome}</b> · ${Object.keys(e.kpi||{}).length} safras · ${f.name}`);
+    }catch(x){err.push(`${f.name}: ${x}`)}
+    finally{pend--; if(!pend)finalizarCarga(ok,err,last)}};
+    rd.onerror=()=>{err.push(`${f.name}: falha de leitura`); pend--; if(!pend)finalizarCarga(ok,err,last)};
     rd.readAsArrayBuffer(f);
   });
 }
-document.getElementById('file').addEventListener('change',ev=>carregarArquivos(ev.target.files));
+document.getElementById('file').addEventListener('change',ev=>{carregarArquivos(ev.target.files); ev.target.value='';});
 let dragN=0;
 window.addEventListener('dragenter',e=>{e.preventDefault();dragN++;document.getElementById('drop-ov').style.display='flex'});
 window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragN<=0){dragN=0;document.getElementById('drop-ov').style.display='none'}});
@@ -461,13 +551,13 @@ window.addEventListener('drop',e=>{e.preventDefault();dragN=0;document.getElemen
 // ============ BOOT ============
 fetch('dados.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(db=>{
   DB=db; DB.emissoes.forEach(prep);
-  document.getElementById('sync-txt').textContent='base de '+db.gerado.replace('T',' ');
+  setSync('base de '+db.gerado.replace('T',' '));
   renderNav(); renderPort();
 }).catch(()=>{
   document.getElementById('err').style.display='block';
   document.getElementById('view-port').style.display='none';
-  const s=document.getElementById('sync');s.classList.add('err');
-  document.getElementById('sync-txt').textContent='dados.json não encontrado';
+  setSync('dados.json não encontrado','err');
+  setLoadMeta('Base local indisponível');
 });
 </script>
 </body></html>
