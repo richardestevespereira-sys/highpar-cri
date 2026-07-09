@@ -83,9 +83,10 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
 .kcard .mini .mi{background:#FBFAF7;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
 .kcard .mini .mi .k{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-2)}
 .kcard .mini .mi .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;margin-top:2px}
-.bar{height:20px;background:var(--green-soft);border-radius:10px;overflow:hidden;position:relative;margin:8px 0 4px}
-.bar>div{height:100%;background:linear-gradient(90deg,var(--green),#1E7A63);border-radius:10px}
-.bar span{position:absolute;left:50%;top:0;transform:translateX(-50%);font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--ink);line-height:20px}
+.progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.progress-metric{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;color:var(--ink);background:#FBFAF7;border:1px solid var(--line);border-radius:999px;padding:5px 9px;white-space:nowrap}
+.bar{height:12px;background:var(--green-soft);border-radius:999px;overflow:hidden;position:relative;margin:0 0 8px}
+.bar>div{height:100%;background:linear-gradient(90deg,var(--green),#1E7A63);border-radius:999px}
 #banner{display:none;max-width:100%;margin-bottom:14px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;font-size:12.5px}
 #banner.ok{background:var(--green-soft);border-color:var(--green);color:var(--green)}
 #banner.err{background:var(--red-soft);border-color:var(--red);color:var(--red)}
@@ -147,7 +148,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
   </div>
   <div class="sp"></div>
   <div class="grid charts2">
-    <div class="card"><h3>Obra — evolução física<div class="bar"><div id="obra_bar" style="width:0%"></div><span id="obra_pct"></span></div></h3><div class="chartbox"><canvas id="ch_obra"></canvas></div></div>
+    <div class="card"><div class="progress-head"><h3>Obra — evolução física</h3><span id="obra_pct" class="progress-metric">—</span></div><div class="bar"><div id="obra_bar" style="width:0%"></div></div><div class="chartbox"><canvas id="ch_obra"></canvas></div></div>
     <div class="tablewrap" id="e-carac"></div>
   </div>
   <div class="sp"></div>
