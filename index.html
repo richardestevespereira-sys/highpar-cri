@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highpar — Monitoramento de CRIs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --paper:#F6F5F1; --card:#FFFFFF; --ink:#19231F; --ink-2:#54625B; --line:#E2E0D8;
+  --green:#155446; --green-soft:#E3EEE9; --gold:#B9892F; --gold-soft:#F6EEDB;
+  --red:#B3402E; --red-soft:#F7E4E0; --blue:#2D5C8A; --blue-soft:#E3ECF5;
+  --side:#10211B; --side-ink:#C9D6CF;
+  --r:10px; --shadow:0 1px 2px rgba(25,35,31,.06), 0 4px 14px rgba(25,35,31,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--paper);color:var(--ink);font-size:14px;display:flex}
+h1,h2,h3,.brand{font-family:'Archivo',sans-serif}
+aside{width:238px;min-height:100vh;background:var(--side);color:var(--side-ink);padding:22px 14px;display:flex;flex-direction:column;gap:4px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{color:#fff;font-weight:800;font-size:17px;letter-spacing:.3px;padding:0 10px 6px}
+.brand small{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:10px;color:#7E978C;letter-spacing:1.6px;text-transform:uppercase;margin-top:3px}
+.navsec{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#5F7A6E;padding:16px 10px 6px}
+.nav-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--side-ink);font:inherit;font-weight:500;padding:9px 10px;border-radius:8px;cursor:pointer}
+.nav-btn:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-btn.active{background:var(--green);color:#fff}
+.nav-btn svg{width:16px;height:16px;flex-shrink:0}
+.nav-btn .fdot{width:8px;height:8px;border-radius:99px;margin-left:auto;flex-shrink:0}
+.side-foot{margin-top:auto;font-size:11px;color:#5F7A6E;padding:10px;border-top:1px solid rgba(255,255,255,.08)}
+.sync{display:flex;align-items:center;gap:7px;font-size:11px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.05);margin-top:10px}
+.sync .dot{width:8px;height:8px;border-radius:99px;background:#4CC38A;flex-shrink:0}
+.sync.err .dot{background:#E5484D}
+main{flex:1;min-width:0;padding:26px 30px 60px;max-width:1340px}
+.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.topbar h1{font-size:22px;font-weight:700}
+.topbar .sub{color:var(--ink-2);margin-top:3px;font-size:13px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+label.flbl{font-size:12px;color:var(--ink-2)}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(178px,1fr))}
+.cards2{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
+.card h3{font-size:13.5px;font-weight:700;margin-bottom:12px}
+.card h3 .hint{font-family:'IBM Plex Sans',sans-serif;font-weight:400;font-size:11.5px;color:var(--ink-2);margin-left:6px}
+.kpi .lbl{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:var(--ink-2)}
+.kpi .val{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;margin-top:6px}
+.kpi .delta{font-size:12px;margin-top:4px;color:var(--ink-2)}
+.delta.pos{color:var(--green)} .delta.neg{color:var(--red)}
+.charts2{grid-template-columns:1.4fr 1fr}
+@media(max-width:1100px){.charts2{grid-template-columns:1fr}}
+.chartbox{position:relative;height:250px}
+.sp{height:14px}
+.tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);color:var(--ink-2);font-size:10.5px;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;background:#FBFAF7}
+td{padding:9px 12px;border-bottom:1px solid #F0EEE8;white-space:nowrap}
+tr:hover td{background:#FAF9F5}
+td.r,th.r{text-align:right}
+td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.3px}
+.badge.g{background:var(--green-soft);color:var(--green)}
+.badge.y{background:var(--gold-soft);color:var(--gold)}
+.badge.r{background:var(--red-soft);color:var(--red)}
+.badge.n{background:#EEEDE8;color:var(--ink-2)}
+.kcard{background:#fff;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:8px;padding:14px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
+.kcard:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(25,35,31,.12)}
+.kcard .t{font-weight:700;font-size:15px;font-family:'Archivo',sans-serif}
+.kcard .m{color:var(--ink-2);margin-top:2px;font-size:12px}
+.kcard .v{font-family:'IBM Plex Mono',monospace;font-weight:600;margin-top:8px;font-size:18px}
+.kcard .fx{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.bar{height:20px;background:var(--green-soft);border-radius:10px;overflow:hidden;position:relative;margin:8px 0 4px}
+.bar>div{height:100%;background:linear-gradient(90deg,var(--green),#1E7A63);border-radius:10px}
+.bar span{position:absolute;left:50%;top:0;transform:translateX(-50%);font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--ink);line-height:20px}
+#err{max-width:640px;margin:60px auto;background:var(--red-soft);border:1px solid var(--red);border-radius:10px;padding:24px;display:none}
+#err h2{color:var(--red);margin-bottom:8px}
+#err code{background:#fff;padding:2px 6px;border-radius:4px;font-size:12px}
+@media print{aside{display:none}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">Highpar<small>Monitoramento · CRI</small></div>
+  <div class="navsec">Portfólio</div>
+  <button class="nav-btn active" data-view="port" onclick="nav('port')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Visão geral</button>
+  <div class="navsec">Emissões</div>
+  <div id="navemis"></div>
+  <div class="sync" id="sync"><span class="dot"></span><span id="sync-txt">carregando…</span></div>
+  <div class="side-foot">Banco: site/dados.json<br>Atualize com atualizar_dados.py</div>
+</aside>
+<main>
+<div id="err"><h2>Base de dados não carregada</h2>
+<p>O portal lê o arquivo <code>dados.json</code> na mesma pasta. Se você abriu o index.html direto do disco, rode um servidor local:</p>
+<p style="margin-top:8px"><code>python -m http.server 8080</code> e acesse <code>http://localhost:8080</code> — ou publique a pasta no GitHub Pages.</p></div>
+
+<section class="view" id="view-port" style="display:block">
+  <div class="topbar">
+    <div><h1>Portfólio de CRIs</h1><div class="sub" id="port-sub">—</div></div>
+  </div>
+  <div class="grid kpis" id="port-kpis"></div>
+  <div class="sp"></div>
+  <div class="grid cards2" id="port-cards"></div>
+</section>
+
+<section class="view" id="view-emis" style="display:none">
+  <div class="topbar">
+    <div><h1 id="e-tt"></h1><div class="sub" id="e-sub"></div></div>
+    <div class="toolbar"><label class="flbl">Mês de referência</label><select id="selm" onchange="RE()"></select></div>
+  </div>
+  <div class="card" id="e-farol" style="margin-bottom:14px"></div>
+  <div class="grid kpis" id="e-kpis"></div>
+  <div class="sp"></div>
+  <div class="grid charts2">
+    <div class="card"><h3>Recebimentos da carteira <span class="hint">diário, mês selecionado</span></h3><div class="chartbox"><canvas id="ch_receb"></canvas></div></div>
+    <div class="card"><h3>Evolução mensal <span class="hint">saldos e VP</span></h3><div class="chartbox"><canvas id="ch_evo"></canvas></div></div>
+  </div>
+  <div class="sp"></div>
+  <div class="grid charts2">
+    <div class="card"><h3>Aging da inadimplência <span class="hint">mês selecionado</span></h3><div class="chartbox"><canvas id="ch_aging"></canvas></div></div>
+    <div class="card"><h3>Obra — evolução física<div class="bar"><div id="obra_bar" style="width:0%"></div><span id="obra_pct"></span></div></h3><div class="chartbox"><canvas id="ch_obra"></canvas></div></div>
+  </div>
+  <div class="sp"></div>
+  <div class="grid charts2">
+    <div class="tablewrap" id="e-carac"></div>
+    <div class="tablewrap" id="e-farolhist"></div>
+  </div>
+  <div class="sp"></div>
+  <div class="tablewrap" id="e-tbl"></div>
+</section>
+</main>
+
+<script>
+const CORES = ['#155446','#B9892F','#2D5C8A','#B3402E','#54625B','#1E7A63'];
+Chart.defaults.font.family = "'IBM Plex Sans',sans-serif";
+Chart.defaults.color = '#54625B';
+const fmt = (v,dec=0)=> v==null?'—':v.toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const fBRL=v=> v==null?'—':(Math.abs(v)>=1e6? 'R$ '+(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:2})+' mi' : 'R$ '+fmt(v));
+const mmYY=m=>{const [a,b]=m.split('-');return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+b-1]+'/'+a.slice(2)};
+const bcls={'VERDE':'g','AMARELO':'y','VERMELHO':'r','S/ DADO':'n'};
+const fVal=(v,f)=> v==null?'—':(f==='pct'? (v<=3? fmt(v*100,1)+'%' : fmt(v,2)) : f==='x'? fmt(v,2)+'x' : fmt(v,2));
+let DB=null, CUR=null, CH={};
+
+function g(o,k){return o&&o[k]!=null?o[k]:null}
+// heurísticas genéricas: acha métrica por padrão de nome, sem hardcode de emissão
+function achar(mets, ...padroes){
+  for(const p of padroes){ const re=new RegExp(p,'i'); const hit=mets.find(m=>re.test(m)); if(hit) return hit; }
+  return null;
+}
+function kpiCard(lab,val,prev,fm){
+  let cls='',txt='—';
+  if(prev!=null&&prev!==0&&val!=null){const p=(val-prev)/Math.abs(prev)*100;cls=p>=0?'pos':'neg';txt=(p>=0?'+':'')+p.toLocaleString('pt-BR',{maximumFractionDigits:1})+'% vs mês ant.'}
+  return `<div class="card kpi"><div class="lbl">${lab}</div><div class="val">${fm(val)}</div><div class="delta ${cls}">${txt}</div></div>`;
+}
+function mk(id,type,data,opts){
+  if(CH[id])CH[id].destroy();
+  CH[id]=new Chart(document.getElementById(id).getContext('2d'),{type,data,
+    options:Object.assign({responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:Object.assign({legend:{position:'top',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}}},(opts||{}).plugins||{})},opts||{})});
+}
+function nav(v, id){
+  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
+  if(v==='port'){ document.querySelector('[data-view="port"]').classList.add('active');
+    document.getElementById('view-port').style.display='block';
+    document.getElementById('view-emis').style.display='none'; }
+  else { const b=document.querySelector(`[data-emis="${id}"]`); if(b)b.classList.add('active');
+    document.getElementById('view-port').style.display='none';
+    document.getElementById('view-emis').style.display='block';
+    abrir(id); }
+}
+function farolGeral(e){
+  const meses=Object.keys(e.kpi).sort(); const last=meses[meses.length-1];
+  const fh=(e.farol_hist||{})[last]||[];
+  if(fh.some(f=>f.status==='VERMELHO'))return 'VERMELHO';
+  if(fh.some(f=>f.status==='AMARELO'))return 'AMARELO';
+  if(fh.length&&fh.every(f=>f.status==='S/ DADO'))return 'S/ DADO';
+  return fh.length?'VERDE':'S/ DADO';
+}
+const fdotColor={'VERDE':'#4CC38A','AMARELO':'#B9892F','VERMELHO':'#E5484D','S/ DADO':'#9AA6A0'};
+
+function renderPort(){
+  const es=DB.emissoes;
+  document.getElementById('port-sub').textContent = es.length+' emissões monitoradas · base de '+DB.gerado.replace('T',' ');
+  let sdTot=0, recTot=0, alertas=0, comDado=0;
+  es.forEach(e=>{
+    const meses=Object.keys(e.kpi).sort(); const last=meses[meses.length-1];
+    const mets=Object.keys(e.kpi[last]||{});
+    const mSD=achar(mets,'saldo devedor.*s[êe]nior','saldo devedor');
+    if(mSD!=null&&g(e.kpi[last],mSD)!=null){sdTot+=g(e.kpi[last],mSD);comDado++}
+    e.receb.forEach(r=>{ if(r.d.slice(0,7)===last) recTot+=r.v });
+    const st=farolGeral(e); if(st==='AMARELO'||st==='VERMELHO')alertas++;
+  });
+  document.getElementById('port-kpis').innerHTML =
+    kpiCard('Emissões', es.length, null, v=>fmt(v))+
+    kpiCard('Saldo devedor sênior (soma)', comDado?sdTot:null, null, fBRL)+
+    kpiCard('Recebido no último mês (soma)', recTot||null, null, fBRL)+
+    kpiCard('Emissões em alerta', alertas, null, v=>fmt(v));
+  document.getElementById('port-cards').innerHTML = es.map(e=>{
+    const meses=Object.keys(e.kpi).sort(); const last=meses[meses.length-1];
+    const mets=Object.keys(e.kpi[last]||{});
+    const mSD=achar(mets,'saldo devedor.*s[êe]nior','saldo devedor');
+    const st=farolGeral(e);
+    const fh=((e.farol_hist||{})[last]||[]).map(f=>`<span class="badge ${bcls[f.status]||'n'}" title="${f.indicador}: ${fVal(f.valor,f.formato)}">${f.indicador.split('—')[0].trim()}</span>`).join('');
+    return `<div class="kcard" style="border-left-color:${fdotColor[st]}" onclick="nav('emis','${e.id}')">
+      <div class="t">${e.titulo} ${e.nome}</div>
+      <div class="m">Último mês: ${last?mmYY(last):'—'} · ${Object.keys(e.kpi).length} safras na base</div>
+      <div class="v">${mSD?fBRL(g(e.kpi[last],mSD)):'—'} <span style="font-size:11px;color:var(--ink-2);font-family:'IBM Plex Sans'">saldo devedor</span></div>
+      <div class="fx">${fh||'<span class="badge n">sem farol</span>'}</div></div>`;
+  }).join('');
+}
+
+function abrir(id){
+  CUR=DB.emissoes.find(e=>e.id===id); if(!CUR)return;
+  document.getElementById('e-tt').textContent=CUR.titulo+' '+CUR.nome;
+  document.getElementById('e-sub').textContent='Lâmina dinâmica · arquivo: '+CUR.arquivo;
+  const meses=Object.keys(CUR.kpi).sort();
+  const sel=document.getElementById('selm'); sel.innerHTML='';
+  meses.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=mmYY(m);sel.appendChild(o)});
+  sel.value=meses[meses.length-1];
+  RE();
+}
+function RE(){
+  const e=CUR; if(!e)return;
+  const meses=Object.keys(e.kpi).sort();
+  const m=document.getElementById('selm').value, i=meses.indexOf(m), mp=i>0?meses[i-1]:null;
+  const K=e.kpi[m]||{}, P=mp?e.kpi[mp]:{};
+  const mets=[...new Set(meses.flatMap(mm=>Object.keys(e.kpi[mm]||{})))];
+  const recebMes={}; e.receb.forEach(r=>{const mm=r.d.slice(0,7);recebMes[mm]=(recebMes[mm]||0)+r.v});
+  // farol
+  const fh=(e.farol_hist||{})[m]||[];
+  document.getElementById('e-farol').innerHTML='<h3>Farol de risco <span class="hint">enquadramento no mês</span></h3>'+
+    (fh.length? fh.map(f=>`<span class="badge ${bcls[f.status]||'n'}" style="margin-right:8px;margin-bottom:6px">${f.indicador}: ${fVal(f.valor,f.formato)} · ${f.status}</span>`).join('') : '<span class="badge n">Nenhuma regra de farol configurada na Config</span>');
+  // KPIs principais por heurística (funciona para qualquer emissão)
+  const mSD=achar(mets,'saldo devedor.*s[êe]nior','saldo devedor');
+  const mVP=achar(mets,'vp carteira.*s[êe]nior','vp carteira','valor presente');
+  const mIN=achar(mets,'inadimpl','em aberto vencido');
+  const mIL=achar(mets,'liquidez.*s[êe]nior','ilg.*s[êe]nior','liquidez','ilg');
+  const mES=achar(mets,'estoque');
+  document.getElementById('e-kpis').innerHTML =
+    (mSD?kpiCard(mSD,g(K,mSD),g(P,mSD),fBRL):'')+
+    (mVP?kpiCard(mVP,g(K,mVP),g(P,mVP),fBRL):'')+
+    kpiCard('Recebido no mês',recebMes[m]||null,mp?recebMes[mp]:null,fBRL)+
+    (mIN?kpiCard(mIN,g(K,mIN),g(P,mIN),fBRL):'')+
+    (mIL?kpiCard(mIL,g(K,mIL),g(P,mIL),v=>v==null?'—':fmt(v,2)+'x'):'')+
+    (mES?kpiCard(mES,g(K,mES),g(P,mES),fBRL):'');
+  // recebimentos diários
+  const rd=e.receb.filter(r=>r.d.slice(0,7)===m);
+  mk('ch_receb','bar',{labels:rd.map(r=>r.d.slice(8)),datasets:[{label:'R$/dia',data:rd.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4}]},
+     {plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)}}}});
+  // evolução: métricas de saldo/VP encontradas (até 4)
+  const evoM=mets.filter(k=>/saldo devedor|vp carteira|valor presente/i.test(k)).slice(0,4);
+  mk('ch_evo','line',{labels:meses.map(mmYY),datasets:evoM.map((k,j)=>({label:k,data:meses.map(mm=>g(e.kpi[mm],k)),borderColor:CORES[j],backgroundColor:CORES[j]+'22',tension:.3,borderWidth:2,spanGaps:true}))},
+     {scales:{y:{ticks:{callback:v=>fBRL(v)}}}});
+  // aging: métricas que começam com "Inad "
+  const bl=mets.filter(k=>/^inad /i.test(k));
+  mk('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:bl.map(b=>g(K,b)),backgroundColor:CORES.map(c=>c+'CC'),borderRadius:4}]},
+     {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}});
+  // obra
+  const ob=e.obra||[];
+  let acc=0; const obAcc=ob.map(o=>{acc+=o.pct;return {m:o.m,acc:Math.min(acc,1),med:o.med}});
+  const cur=obAcc.filter(o=>o.m<=m).slice(-1)[0]||obAcc.slice(-1)[0];
+  const pctA=cur?cur.acc:0;
+  document.getElementById('obra_bar').style.width=(pctA*100).toFixed(1)+'%';
+  document.getElementById('obra_pct').textContent=(pctA*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'% de '+fBRL(e.orcamento);
+  mk('ch_obra','bar',{labels:ob.map(o=>mmYY(o.m)),datasets:[
+     {type:'line',label:'% acumulado',data:obAcc.map(o=>o.acc*100),yAxisID:'y1',borderColor:'#B3402E',borderWidth:2,tension:.3},
+     {label:'Medição (R$)',data:ob.map(o=>o.med),backgroundColor:'#155446CC',borderRadius:4}]},
+     {scales:{y:{ticks:{callback:v=>fmt(v)}},y1:{position:'right',min:0,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}}}});
+  // características + séries
+  let hc='<table><thead><tr><th colspan="2">Características da emissão</th></tr></thead><tbody>';
+  (e.carac||[]).forEach(c=>{hc+=`<tr><td>${c.k}</td><td class="r mono">${typeof c.v==='number'?fmt(c.v,2):c.v}</td></tr>`});
+  (e.series||[]).forEach(s=>{hc+=`<tr><td>Série ${s.n} — ${s.nome||''}</td><td class="r mono">${s.taxa!=null?fmt(s.taxa*100,2)+'% a.a.':'—'}</td></tr>`});
+  document.getElementById('e-carac').innerHTML=hc+'</tbody></table>';
+  // histórico do farol
+  let hf='<table><thead><tr><th>Farol — histórico</th>'+meses.map(mm=>`<th class="r">${mmYY(mm)}</th>`).join('')+'</tr></thead><tbody>';
+  (e.farol||[]).forEach(f=>{
+    hf+=`<tr><td>${f.indicador}</td>`+meses.map(mm=>{
+      const x=((e.farol_hist||{})[mm]||[]).find(y=>y.indicador===f.indicador);
+      return `<td class="r"><span class="badge ${bcls[(x||{}).status]||'n'}">${x?fVal(x.valor,x.formato):'—'}</span></td>`;
+    }).join('')+'</tr>'});
+  document.getElementById('e-farolhist').innerHTML=hf+'</tbody></table>';
+  // tabela completa
+  let h='<table><thead><tr><th>Métrica</th>'+meses.map(mm=>`<th class="r">${mmYY(mm)}</th>`).join('')+'</tr></thead><tbody>';
+  mets.sort().forEach(k=>{h+=`<tr><td>${k}</td>`+meses.map(mm=>`<td class="r mono">${fmt(g(e.kpi[mm],k),2)}</td>`).join('')+'</tr>'});
+  h+=`<tr><td><b>Recebido no mês (conta)</b></td>`+meses.map(mm=>`<td class="r mono"><b>${fmt(recebMes[mm],2)}</b></td>`).join('')+'</tr>';
+  document.getElementById('e-tbl').innerHTML=h+'</tbody></table>';
+}
+
+fetch('dados.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(db=>{
+  DB=db;
+  document.getElementById('sync-txt').textContent='base de '+db.gerado.replace('T',' ');
+  const nav_=document.getElementById('navemis');
+  nav_.innerHTML=db.emissoes.map(e=>{
+    const st=farolGeral(e);
+    return `<button class="nav-btn" data-emis="${e.id}" onclick="nav('emis','${e.id}')">`+
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>${e.nome}`+
+      `<span class="fdot" style="background:${fdotColor[st]}"></span></button>`;
+  }).join('');
+  renderPort();
+}).catch(()=>{
+  document.getElementById('err').style.display='block';
+  document.getElementById('view-port').style.display='none';
+  const s=document.getElementById('sync');s.classList.add('err');
+  document.getElementById('sync-txt').textContent='dados.json não encontrado';
+});
+</script>
+</body></html>
