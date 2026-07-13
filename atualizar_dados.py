@@ -12,7 +12,7 @@ Uso:
   python atualizar_dados.py                       -> varre "Consolidado - *.xlsx"
   python atualizar_dados.py arq1.xlsx arq2.xlsx   -> só os citados
 """
-import sys, os, json, glob, re, datetime as dt
+import sys, os, json, glob, re, datetime as dt, unicodedata
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string as CI
 
@@ -42,6 +42,73 @@ def num(x):
 def slug(s):
     s = re.sub(r'[^a-zA-Z0-9]+','_', str(s).strip().lower())
     return s.strip('_')
+
+def texto_normalizado(x):
+    """Texto comparavel entre layouts, sem depender de acentos ou caixa."""
+    return unicodedata.normalize('NFKD', str(x or '')).encode('ascii', 'ignore').decode().strip().lower()
+
+def nome_faixa_atraso(faixa=None, dias=None):
+    """Converte faixas heterogeneas do servicer para as chaves do portal."""
+    txt = texto_normalizado(faixa)
+    nums = [int(n) for n in re.findall(r'\d+', txt)]
+    if 'acima' in txt or 'maior' in txt or ('+' in txt and nums):
+        return 'Inad Acima de 360 dias'
+    if len(nums) >= 2:
+        inicio, fim = nums[0], nums[1]
+    else:
+        atraso = num(dias)
+        if atraso is None or atraso <= 0:
+            return None
+        inicio, fim = ((1, 30) if atraso <= 30 else (31, 60) if atraso <= 60 else
+                       (61, 90) if atraso <= 90 else (91, 120) if atraso <= 120 else
+                       (121, 180) if atraso <= 180 else (181, 360) if atraso <= 360 else (361, 99999))
+    if fim <= 30: return 'Inad Ate 30 dias'
+    if inicio <= 60 and fim <= 60: return 'Inad De 31 a 60 dias'
+    if inicio <= 90 and fim <= 90: return 'Inad De 61 a 90 dias'
+    if inicio <= 120 and fim <= 120: return 'Inad De 91 a 120 dias'
+    if inicio <= 180 and fim <= 180: return 'Inad De 121 a 180 dias'
+    if inicio <= 360 and fim <= 360: return 'Inad De 181 a 360 dias'
+    return 'Inad Acima de 360 dias'
+
+def complementar_kpi_inadimplencia(wb, kpi):
+    """Resume BD_Inadimplencia quando o aging ainda nao veio no BD_KPI."""
+    if 'BD_Inadimplencia' not in wb.sheetnames:
+        return
+    ws = wb['BD_Inadimplencia']
+    headers = [texto_normalizado(c.value) for c in ws[1]]
+
+    def coluna(*padroes):
+        return next((i for i, h in enumerate(headers) if any(re.search(p, h) for p in padroes)), None)
+
+    c_data = coluna(r'^data do relatorio$', r'^safra$')
+    c_faixa = coluna(r'periodo de atraso', r'faixa.*atraso', r'^faixa$')
+    c_dias = coluna(r'dias de atraso')
+    c_valor = coluna(r'^valor em atraso$', r'valor.*inadimpl')
+    c_parcelas = coluna(r'parcelas em aberto')
+    if c_data is None or c_valor is None:
+        return
+    totais, parcelas = {}, {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        data = row[c_data] if c_data < len(row) else None
+        valor = num(row[c_valor]) if c_valor < len(row) else None
+        if not isinstance(data, (dt.date, dt.datetime)) or valor is None or valor <= 0:
+            continue
+        mes = d2s(data)[:7]
+        faixa = nome_faixa_atraso(row[c_faixa] if c_faixa is not None and c_faixa < len(row) else None,
+                                  row[c_dias] if c_dias is not None and c_dias < len(row) else None)
+        if not faixa:
+            continue
+        faixas = totais.setdefault(mes, {})
+        faixas[faixa] = faixas.get(faixa, 0) + valor
+        if c_parcelas is not None and c_parcelas < len(row):
+            parcelas[mes] = parcelas.get(mes, 0) + (num(row[c_parcelas]) or 0)
+    for mes, faixas in totais.items():
+        destino = kpi.setdefault(mes, {})
+        for faixa, valor in faixas.items():
+            destino.setdefault(faixa, round(valor, 2))
+        destino.setdefault('Inadimplencia (R$)', round(sum(faixas.values()), 2))
+        if parcelas.get(mes):
+            destino.setdefault('Inadimplencia (parcelas)', round(parcelas[mes], 0))
 
 def mensalizar_recebimentos(receb):
     """Consolida movimentos validos por mes para o portal."""
@@ -98,6 +165,7 @@ def extrair(path):
             v = num(v)
             if s and m and v is not None:
                 kpi.setdefault(d2s(s)[:7], {})[str(m)] = round(v, 4)
+    complementar_kpi_inadimplencia(wb, kpi)
 
     # extrato: recebimentos da carteira e pagamentos ao CRI (flags do _SCHEMA)
     receb, pag_cri = [], {}
@@ -212,7 +280,7 @@ def main():
     if not arquivos:
         raise SystemExit('Nenhum arquivo "Consolidado - *.xlsx" valido foi encontrado.')
 
-    destino = os.path.join('site', 'dados.json')
+    destino = os.environ.get('DADOS_JSON') or (os.path.join('site', 'dados.json') if os.path.isdir('site') else 'dados.json')
     base = ler_base_existente(destino)
     por_id = {e.get('id'): e for e in base['emissoes'] if e.get('id')}
     atualizadas, novas = [], []
