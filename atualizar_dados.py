@@ -13,6 +13,7 @@ Uso:
   python atualizar_dados.py arq1.xlsx arq2.xlsx   -> só os citados
 """
 import sys, os, json, glob, re, datetime as dt, unicodedata
+from statistics import median
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string as CI
 
@@ -110,6 +111,89 @@ def complementar_kpi_inadimplencia(wb, kpi):
         if parcelas.get(mes):
             destino.setdefault('Inadimplencia (parcelas)', round(parcelas[mes], 0))
 
+def _cabecalhos(ws):
+    return [texto_normalizado(c.value) for c in ws[1]]
+
+def _coluna(headers, *padroes):
+    return next((i for i, h in enumerate(headers) if any(re.search(p, h) for p in padroes)), None)
+
+def _mes_data(x):
+    return d2s(x)[:7] if isinstance(x, (dt.date, dt.datetime)) else None
+
+def extrair_analiticos_inadimplencia(wb, kpi):
+    """Gera series reutilizaveis sem misturar mes de caixa, vencimento e snapshot."""
+    rastro, faixas = [], []
+
+    # Rastro por coorte de vencimento no ultimo snapshot comum. Exige uma
+    # classificacao explicita do saldo aberto para nao presumir inadimplencia.
+    if 'BD_Recebimento' in wb.sheetnames and 'BD_Receber' in wb.sheetnames:
+        wr, wa = wb['BD_Recebimento'], wb['BD_Receber']
+        hr, ha = _cabecalhos(wr), _cabecalhos(wa)
+        rr = _coluna(hr, r'^data do relatorio$', r'^safra')
+        rv = _coluna(hr, r'^data vencimento$', r'^dt\.? venc', r'^vencimento$')
+        rval = _coluna(hr, r'^valor corrigido$', r'^valor parcela$', r'^valor pago$')
+        ar = _coluna(ha, r'^data do relatorio$', r'^safra')
+        av = _coluna(ha, r'^data vencimento$', r'^dt\.? venc', r'^vencimento$')
+        aval = _coluna(ha, r'^valor corrigido$', r'^valor parcela$', r'^valor em atraso$', r'^valor$')
+        acl = _coluna(ha, r'^classificacao$', r'^status$', r'^situacao$')
+        if None not in (rr, rv, rval, ar, av, aval, acl):
+            sr = {_mes_data(row[rr]) for row in wr.iter_rows(min_row=2, values_only=True)}
+            sa = {_mes_data(row[ar]) for row in wa.iter_rows(min_row=2, values_only=True)}
+            comuns = sorted((sr & sa) - {None})
+            if comuns:
+                ref = comuns[-1]
+                recebido, vencido = {}, {}
+                for row in wr.iter_rows(min_row=2, values_only=True):
+                    if _mes_data(row[rr]) != ref: continue
+                    mes, valor = _mes_data(row[rv]), num(row[rval])
+                    if mes and mes < ref and valor is not None and valor > 0:
+                        recebido[mes] = recebido.get(mes, 0) + valor
+                for row in wa.iter_rows(min_row=2, values_only=True):
+                    if _mes_data(row[ar]) != ref: continue
+                    status = texto_normalizado(row[acl])
+                    if not re.search(r'vencid|atras|inadimpl', status): continue
+                    mes, valor = _mes_data(row[av]), num(row[aval])
+                    if mes and mes < ref and valor is not None and valor > 0:
+                        vencido[mes] = vencido.get(mes, 0) + valor
+                for mes in sorted(set(recebido) | set(vencido)):
+                    rec, ina = recebido.get(mes, 0), vencido.get(mes, 0)
+                    total = rec + ina
+                    if total > 0:
+                        rastro.append({'m': mes, 'recebido': round(rec / total, 6),
+                                       'inadimplente': round(ina / total, 6), 'as_of': ref})
+
+    # Curvas cumulativas >30/>60/>90 por snapshot, sobre o saldo da carteira.
+    if 'BD_Inadimplencia' in wb.sheetnames:
+        ws, h = wb['BD_Inadimplencia'], _cabecalhos(wb['BD_Inadimplencia'])
+        cd = _coluna(h, r'^data do relatorio$', r'^safra')
+        cdi = _coluna(h, r'^dias de atraso$', r'^dias mais atrasad')
+        cv = _coluna(h, r'^valor em atraso$', r'valor.*inadimpl')
+        cs = _coluna(h, r'^saldo devedor$')
+        cp = _coluna(h, r'participacao.*saldo devedor')
+        if None not in (cd, cdi, cv):
+            bruto, implicitos = {}, {}
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                mes, dias, valor = _mes_data(row[cd]), num(row[cdi]), num(row[cv])
+                if not mes or dias is None or valor is None or valor <= 0: continue
+                x = bruto.setdefault(mes, {'p30': 0, 'p60': 0, 'p90': 0})
+                if dias > 30: x['p30'] += valor
+                if dias > 60: x['p60'] += valor
+                if dias > 90: x['p90'] += valor
+                if cs is not None and cp is not None:
+                    saldo, part = num(row[cs]), num(row[cp])
+                    if saldo and part and part > 0:
+                        implicitos.setdefault(mes, []).append(saldo / part)
+            for mes in sorted(bruto):
+                base = next((num(v) for nome, v in (kpi.get(mes) or {}).items()
+                             if re.search(r'saldo devedor.*carteira', texto_normalizado(nome)) and num(v)), None)
+                if not base and implicitos.get(mes): base = median(implicitos[mes])
+                if not base or base <= 0: continue
+                faixas.append({'m': mes, 'p30': round(bruto[mes]['p30'] / base, 6),
+                               'p60': round(bruto[mes]['p60'] / base, 6),
+                               'p90': round(bruto[mes]['p90'] / base, 6),
+                               'base': round(base, 2)})
+    return rastro, faixas
+
 def mensalizar_recebimentos(receb):
     """Consolida movimentos validos por mes para o portal."""
     mensal = {}
@@ -166,6 +250,7 @@ def extrair(path):
             if s and m and v is not None:
                 kpi.setdefault(d2s(s)[:7], {})[str(m)] = round(v, 4)
     complementar_kpi_inadimplencia(wb, kpi)
+    inad_trail, inad_faixas = extrair_analiticos_inadimplencia(wb, kpi)
 
     # extrato: recebimentos da carteira e pagamentos ao CRI (flags do _SCHEMA)
     receb, pag_cri = [], {}
@@ -249,6 +334,7 @@ def extrair(path):
             'carac': carac, 'series': series, 'players': players, 'kpi': kpi,
             'receb': receb, 'receb_mensal': receb_mensal, 'pag_cri': pag_cri, 'integ': integ,
             'receber_prev': receber_prev, 'obra': obra, 'orcamento': orcamento,
+            'inad_trail': inad_trail, 'inad_faixas': inad_faixas,
             'farol_regras': farol_regras}
 
 def ler_base_existente(path):

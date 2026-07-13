@@ -54,9 +54,12 @@ label.flbl{font-size:12px;color:var(--ink-2)}
 .kpi .delta{font-size:12px;margin-top:4px;color:var(--ink-2)}
 .delta.pos{color:var(--green)} .delta.neg{color:var(--red)}
 .charts2{grid-template-columns:1fr 1fr}
-.portfolio-analysis{grid-template-columns:minmax(0,1.22fr) minmax(340px,.78fr);align-items:stretch}
-.portfolio-analysis>.card{display:flex;flex-direction:column;min-width:0}
-.portfolio-analysis .chartbox{flex:1;min-height:238px}
+.delinquency-stack{grid-template-columns:1fr;gap:12px}
+.delinquency-stack .chartbox{height:255px}
+.project-grid{grid-template-columns:minmax(0,1.45fr) minmax(340px,.55fr);align-items:start}
+.project-grid>.card{align-self:start;min-width:0}
+.project-grid>.tablewrap{align-self:start;max-height:430px;overflow:auto}
+.project-grid>.tablewrap thead{position:sticky;top:0;z-index:1}
 .section-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:4px 0 10px}
 .section-intro h2{font-size:16px}
 .section-intro p{color:var(--ink-2);font-size:12px;text-align:right}
@@ -66,7 +69,7 @@ label.flbl{font-size:12px;color:var(--ink-2)}
 .aging-stat .v{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aging-foot{font-size:11px;color:var(--ink-2);margin-top:8px;min-height:15px}
 @media(max-width:1100px){.charts2{grid-template-columns:1fr}.cards2{grid-template-columns:1fr}}
-@media(max-width:1100px){.portfolio-analysis{grid-template-columns:1fr}.section-intro{align-items:flex-start;flex-direction:column}.section-intro p{text-align:left}}
+@media(max-width:1100px){.project-grid{grid-template-columns:1fr}.section-intro{align-items:flex-start;flex-direction:column}.section-intro p{text-align:left}}
 @media(max-width:620px){.aging-summary{grid-template-columns:1fr}.aging-stat .k{white-space:normal}}
 .chartbox{position:relative;height:250px}
 .chartbox canvas{width:100%;height:100%}
@@ -155,13 +158,13 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
     <div class="card"><h3>Razões de garantia <span class="hint">ILG por série e LTV, linha do tempo</span></h3><div class="chartbox"><canvas id="ch_razoes"></canvas></div></div>
   </div>
   <div class="sp"></div>
-  <div class="section-intro"><div><h2>Carteira e inadimplência</h2></div><p>Recebimentos no tempo e composição do saldo vencido no mês selecionado.</p></div>
-  <div class="grid portfolio-analysis">
-    <div class="card"><h3>Recebimentos da carteira <span class="hint">mensal e acumulado, período completo</span></h3><div class="chartbox"><canvas id="ch_receb"></canvas></div></div>
-    <div class="card"><h3>Aging da inadimplência <span class="hint">mês selecionado</span></h3><div class="aging-summary" id="aging-summary"></div><div class="chartbox"><canvas id="ch_aging"></canvas></div><div class="aging-foot" id="aging-foot"></div></div>
+  <div class="section-intro"><div><h2>Carteira e inadimplência</h2></div><p>Coortes por vencimento e evolução do aging, sem misturar mês de caixa com mês de referência.</p></div>
+  <div class="grid delinquency-stack">
+    <div class="card"><h3>Rastro de inadimplência <span class="hint">% recebido × inadimplente por mês de vencimento</span></h3><div class="chartbox"><canvas id="ch_inad_trail"></canvas></div></div>
+    <div class="card"><h3>Inadimplência por faixa <span class="hint">% do saldo da carteira em atraso &gt;30 / &gt;60 / &gt;90 dias</span></h3><div class="chartbox"><canvas id="ch_inad_curve"></canvas></div></div>
   </div>
   <div class="sp"></div>
-  <div class="grid charts2">
+  <div class="grid project-grid">
     <div class="card"><div class="progress-head"><h3>Obra — evolução física</h3><span id="obra_pct" class="progress-metric">—</span></div><div class="bar"><div id="obra_bar" style="width:0%"></div></div><div class="chartbox"><canvas id="ch_obra"></canvas></div></div>
     <div class="tablewrap" id="e-carac"></div>
   </div>
@@ -305,6 +308,29 @@ function mkSafe(id,type,data,opts,msg){
   if(!temDadosGrafico(data)){chartEmpty(id,msg); return;}
   mk(id,type,data,opts);
 }
+function normalizarSerieTemporal(labels,datasets,{trimEdges=true,dropEmpty=true}={}){
+  const n=labels.length, ds=datasets.map(s=>Object.assign({},s,{data:Array.from({length:n},(_,i)=>{
+    const v=(s.data||[])[i]; return v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
+  })}));
+  const valido=i=>ds.some(s=>s.data[i]!=null);
+  let idx=Array.from({length:n},(_,i)=>i);
+  if(trimEdges){const first=idx.find(valido),last=[...idx].reverse().find(valido);idx=first==null?[]:idx.filter(i=>i>=first&&i<=last)}
+  if(dropEmpty)idx=idx.filter(valido);
+  return {labels:idx.map(i=>labels[i]),datasets:ds.map(s=>Object.assign({},s,{data:idx.map(i=>s.data[i])}))};
+}
+function mkTemporal(id,type,labels,datasets,opts,msg,config){
+  const data=normalizarSerieTemporal(labels,datasets,config);
+  mkSafe(id,type,data,opts,msg);
+}
+const stackPercentLabels={id:'stackPercentLabels',afterDatasetsDraw(chart,args,pluginOpts){
+  if(!pluginOpts||!pluginOpts.enabled)return;
+  const ctx=chart.ctx; ctx.save(); ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='600 11px Inter, sans-serif';
+  chart.data.datasets.forEach((ds,di)=>chart.getDatasetMeta(di).data.forEach((bar,i)=>{
+    const v=Number(ds.data[i]); if(!Number.isFinite(v)||v<(pluginOpts.min||7))return;
+    const p=bar.tooltipPosition();ctx.fillText(v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%',p.x,p.y);
+  })); ctx.restore();
+}};
+Chart.register(stackPercentLabels);
 function setBanner(html,cls=''){
   const b=document.getElementById('banner');
   b.className=cls; b.style.display='block'; b.innerHTML=html;
@@ -416,34 +442,22 @@ function RE(){
   // razões de garantia (linha do tempo)
   const rz=meses.map(mm=>ratios(e,mm));
   const nomesIlg=[...new Set(rz.flatMap(r=>Object.keys(r.ilg)))];
-  mkSafe('ch_razoes','line',{labels:meses.map(mmYY),datasets:[
-    ...nomesIlg.map((nm,j)=>({label:'ILG '+nm,data:rz.map(r=>r.ilg[nm]??null),borderColor:CORES[j],backgroundColor:CORES[j]+'22',borderWidth:2,tension:.25,spanGaps:true})),
-    {label:'LTV',data:rz.map(r=>r.ltv??null),borderColor:'#B3402E',borderDash:[6,4],borderWidth:2,tension:.25,spanGaps:true}]},
-    {scales:{y:{ticks:{callback:v=>fmt(v,2)}}}},'Sem garantias, ILG ou LTV nesta emissão.');
-  // Recebimentos mensais: barras do mês e linha do acumulado em todo o histórico.
-  const rm=e._recebMensal||[]; let recAcc=0;
-  const recAcum=rm.map(r=>{recAcc+=r.v;return recAcc});
-  mkSafe('ch_receb','bar',{labels:rm.map(r=>mmYY(r.m)),datasets:[
-    {label:'Recebido no mês',data:rm.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4},
-    {type:'line',label:'Recebido acumulado',data:recAcum,yAxisID:'y1',borderColor:'#B9892F',backgroundColor:'#B9892F',borderWidth:2,tension:.25,pointRadius:2}
-  ]},{scales:{y:{ticks:{callback:v=>fBRL(v)}},y1:{position:'right',ticks:{callback:v=>fBRL(v)},grid:{drawOnChartArea:false}}}},'Sem recebimentos mensais válidos para exibir.');
-  // aging
-  const ordemAging=['ate 30','31 a 60','61 a 90','91 a 120','121 a 180','181 a 360','acima de 360','361 a'];
-  const bl=mets.filter(k=>/^inad /i.test(k)&&!/parcelas/i.test(k)).sort((a,b)=>{
-    const ia=ordemAging.findIndex(x=>norm(a).toLowerCase().includes(x));
-    const ib=ordemAging.findIndex(x=>norm(b).toLowerCase().includes(x));
-    return (ia<0?99:ia)-(ib<0?99:ib);
-  });
-  const vals=bl.map(b=>g(K,b)||0), totalAging=vals.reduce((a,v)=>a+v,0);
-  const acima30=bl.reduce((a,b,j)=>a+(norm(b).toLowerCase().includes('ate 30')?0:vals[j]),0);
-  const acima90=bl.reduce((a,b,j)=>a+(/91 a|121 a|181 a|acima|361 a/i.test(norm(b))?vals[j]:0),0);
-  document.getElementById('aging-summary').innerHTML=totalAging?[
-    ['Saldo vencido',fBRL(totalAging)],['Acima de 30 dias',fBRL(acima30)],['Acima de 90 dias',fBRL(acima90)]
-  ].map(([k,v])=>`<div class="aging-stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join(''):'';
-  document.getElementById('aging-foot').textContent=totalAging?`${fmt(acima90/totalAging*100,1)}% do saldo vencido está acima de 90 dias · referência ${mmYY(m)}`:'';
-  const agingCores=['#2F7D64','#73A942','#B4A13A','#D69532','#D16B32','#BF4938','#8F2D2D'];
-  mkSafe('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:vals,backgroundColor:bl.map((_,i)=>(agingCores[i]||agingCores.at(-1))+'DD'),borderRadius:5,barPercentage:.72}]},
-     {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{callback:v=>fBRL(v)}},y:{grid:{display:false}}}},'Sem abertura de inadimplência para o mês selecionado.');
+  mkTemporal('ch_razoes','line',meses.map(mmYY),[
+    ...nomesIlg.map((nm,j)=>({label:'ILG '+nm,data:rz.map(r=>r.ilg[nm]??null),borderColor:CORES[j],backgroundColor:CORES[j]+'22',borderWidth:2,tension:.25,spanGaps:false})),
+    {label:'LTV',data:rz.map(r=>r.ltv??null),borderColor:'#B3402E',borderDash:[6,4],borderWidth:2,tension:.25,spanGaps:false}],
+    {scales:{y:{ticks:{callback:v=>fmt(v,2)}}}},'Sem garantias, ILG ou LTV nesta emissão.',{trimEdges:true,dropEmpty:true});
+  // Inadimplencia: coorte de vencimento no snapshot e curvas cumulativas de aging.
+  const trail=(e.inad_trail||[]).filter(x=>x.m<=m).slice(-15), tf=(e.inad_faixas||[]).filter(x=>x.m<=m);
+  mkTemporal('ch_inad_trail','bar',trail.map(x=>mmYY(x.m)),[
+    {label:'Recebido',data:trail.map(x=>x.recebido*100),backgroundColor:'#245986',borderWidth:0,stack:'coorte'},
+    {label:'Inadimplente',data:trail.map(x=>x.inadimplente*100),backgroundColor:'#C63B2D',borderWidth:0,stack:'coorte'}
+  ],{plugins:{stackPercentLabels:{enabled:true,min:7}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,min:0,max:100,display:false}}},
+  'Rastro indisponível: é necessário ter recebimentos e saldo vencido classificados por vencimento no mesmo snapshot.',{trimEdges:true,dropEmpty:true});
+  const faixaDefs=[['>30','p30','#D59A1A'],['>60','p60','#C66A17'],['>90','p90','#B7372B']];
+  mkTemporal('ch_inad_curve','line',tf.map(x=>mmYY(x.m)),faixaDefs.map(([label,key,cor])=>({
+    label,data:tf.map(x=>x[key]*100),borderColor:cor,backgroundColor:cor,borderWidth:2,tension:.28,pointRadius:2,pointHoverRadius:4,spanGaps:false
+  })),{scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}},
+  'Curvas de aging indisponíveis: faltam dias de atraso ou saldo da carteira para calcular a base.',{trimEdges:true,dropEmpty:true});
   // obra
   const ob=e.obra||[]; let acc=0;
   const obAcc=ob.map(o=>{acc+=o.pct;return{m:o.m,acc:Math.min(acc,1),med:o.med}});
@@ -488,6 +502,32 @@ function numJS(x){if(typeof x==='number')return x;
     else if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
     const f=Number(t);return Number.isFinite(f)?f:null}
   return null}
+function analiticosInadJS(S,kpi){
+  const mes=x=>isDate(x)?dstr(x).slice(0,7):null;
+  const mapa=ws=>{const ref=XLSX.utils.decode_range(ws['!ref']||'A1'),h=[];for(let c=0;c<=ref.e.c;c++)h.push(norm(V(ws,1,c+1)).toLowerCase());
+    return {ref,h,col:(...res)=>{const i=h.findIndex(x=>res.some(re=>re.test(x)));return i<0?0:i+1}}};
+  const rastro=[],faixas=[];
+  if(S['BD_Recebimento']&&S['BD_Receber']){
+    const wr=S['BD_Recebimento'],wa=S['BD_Receber'],mr=mapa(wr),ma=mapa(wa);
+    const rr=mr.col(/^data do relatorio$/, /^safra/),rv=mr.col(/^data vencimento$/, /^dt\.? venc/, /^vencimento$/),rval=mr.col(/^valor corrigido$/, /^valor parcela$/, /^valor pago$/);
+    const ar=ma.col(/^data do relatorio$/, /^safra/),av=ma.col(/^data vencimento$/, /^dt\.? venc/, /^vencimento$/),aval=ma.col(/^valor corrigido$/, /^valor parcela$/, /^valor em atraso$/, /^valor$/),acl=ma.col(/^classificacao$/, /^status$/, /^situacao$/);
+    if(rr&&rv&&rval&&ar&&av&&aval&&acl){
+      const sr=new Set(),sa=new Set();for(let r=2;r<=mr.ref.e.r+1;r++){const x=mes(V(wr,r,rr));if(x)sr.add(x)}for(let r=2;r<=ma.ref.e.r+1;r++){const x=mes(V(wa,r,ar));if(x)sa.add(x)}
+      const ref=[...sr].filter(x=>sa.has(x)).sort().at(-1),rec={},ina={};
+      if(ref){for(let r=2;r<=mr.ref.e.r+1;r++){if(mes(V(wr,r,rr))!==ref)continue;const m=mes(V(wr,r,rv)),v=numJS(V(wr,r,rval));if(m&&m<ref&&v>0)rec[m]=(rec[m]||0)+v}
+        for(let r=2;r<=ma.ref.e.r+1;r++){if(mes(V(wa,r,ar))!==ref||!/vencid|atras|inadimpl/.test(norm(V(wa,r,acl)).toLowerCase()))continue;const m=mes(V(wa,r,av)),v=numJS(V(wa,r,aval));if(m&&m<ref&&v>0)ina[m]=(ina[m]||0)+v}
+        [...new Set([...Object.keys(rec),...Object.keys(ina)])].sort().forEach(m=>{const a=rec[m]||0,b=ina[m]||0,t=a+b;if(t>0)rastro.push({m,recebido:a/t,inadimplente:b/t,as_of:ref})})}
+    }
+  }
+  if(S['BD_Inadimplencia']){
+    const ws=S['BD_Inadimplencia'],mi=mapa(ws),cd=mi.col(/^data do relatorio$/, /^safra/),cdi=mi.col(/^dias de atraso$/, /^dias mais atrasad/),cv=mi.col(/^valor em atraso$/, /valor.*inadimpl/),cs=mi.col(/^saldo devedor$/),cp=mi.col(/participacao.*saldo devedor/),br={},imp={};
+    if(cd&&cdi&&cv){for(let r=2;r<=mi.ref.e.r+1;r++){const m=mes(V(ws,r,cd)),d=numJS(V(ws,r,cdi)),v=numJS(V(ws,r,cv));if(!m||d==null||!(v>0))continue;const x=br[m]=br[m]||{p30:0,p60:0,p90:0};if(d>30)x.p30+=v;if(d>60)x.p60+=v;if(d>90)x.p90+=v;
+        if(cs&&cp){const s=numJS(V(ws,r,cs)),p=numJS(V(ws,r,cp));if(s>0&&p>0)(imp[m]=imp[m]||[]).push(s/p)}}
+      Object.keys(br).sort().forEach(m=>{let base=Object.entries(kpi[m]||{}).find(([k,v])=>/saldo devedor.*carteira/.test(norm(k).toLowerCase())&&numJS(v)>0)?.[1];base=numJS(base);
+        if(!base&&imp[m]?.length){const a=imp[m].sort((x,y)=>x-y),z=a.length; base=z%2?a[(z-1)/2]:(a[z/2-1]+a[z/2])/2}if(base>0)faixas.push({m,p30:br[m].p30/base,p60:br[m].p60/base,p90:br[m].p90/base,base})})}
+  }
+  return {rastro,faixas};
+}
 function parseConsolidado(wbk, fname){
   const S=wbk.Sheets;
   if(!S['_SCHEMA'])throw 'sem aba _SCHEMA (não é consolidado padrão)';
@@ -561,9 +601,11 @@ function parseConsolidado(wbk, fname){
     const pc=numJS(V(S['Obra'],r,CL(ob.cols.pct||'B')+1)), md=numJS(V(S['Obra'],r,CL(ob.cols.medicao||'E')+1));
     if(isDate(mmv)&&(pc!=null||md!=null))obra.push({m:dstr(mmv).slice(0,7),pct:pc||0,med:md||0})}
   const receb_mensal={}; receb.forEach(r=>{const mm=r.d.slice(0,7);receb_mensal[mm]=(receb_mensal[mm]||0)+r.v});
+  const inad=analiticosInadJS(S,kpi);
   const id=(titulo+'_'+nome).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
   return {id,nome:String(nome),titulo:String(titulo),arquivo:fname,gerado:new Date().toISOString().slice(0,10),
     carac,series,players,kpi,receb,receb_mensal:Object.keys(receb_mensal).sort().map(m=>({m,v:Math.round(receb_mensal[m]*100)/100})),pag_cri,integ,receber_prev,obra,
+    inad_trail:inad.rastro,inad_faixas:inad.faixas,
     orcamento:numJS(V(cfg,9,2))||0,farol_regras};
 }
 function validarEmissao(e,fname){
