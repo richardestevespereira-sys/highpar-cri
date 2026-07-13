@@ -14,6 +14,9 @@ python atualizar_dados.py
 
 Isso varre os `Consolidado - *.xlsx` da pasta (qualquer emissão no padrão,
 qualquer estrutura de séries/métricas/farol) e regrava `site/dados.json`.
+O identificador é formado por `Título + Nome` da aba `Config`: se a emissão já
+existe, ela é atualizada; se for nova, é adicionada. Ao rodar para um arquivo
+específico, as demais emissões já publicadas são preservadas.
 Arquivos com `backup`, `teste` ou `template` no nome sao ignorados na varredura automatica.
 Para arquivos específicos: `python atualizar_dados.py "Consolidado - CRI UNIQ.xlsx"`.
 
@@ -62,6 +65,7 @@ Alternativas: Netlify (arraste a pasta `site`) ou servidor interno (copie a past
   planilha só fornece dados brutos e limiares (Config).
 - Home com gauge de risco por emissão (pouco/médio/alto) + ILG/LTV/Carteira.
 - Lâmina: fluxo do investidor com payback, razões de garantia em linha,
-  tabela de métricas filtrada (botão "mostrar todas").
+  recebimentos mensais com acumulado no período completo e tabela de métricas
+  filtrada (botão "mostrar todas").
 - Dá para arrastar um consolidado .xlsx direto na página (vale na sessão;
   para persistir: atualizar_dados.py + git push do dados.json).

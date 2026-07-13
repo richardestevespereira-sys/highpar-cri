@@ -143,7 +143,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
   </div>
   <div class="sp"></div>
   <div class="grid charts2">
-    <div class="card"><h3>Recebimentos da carteira <span class="hint">diário, mês selecionado</span></h3><div class="chartbox"><canvas id="ch_receb"></canvas></div></div>
+    <div class="card"><h3>Recebimentos da carteira <span class="hint">mensal e acumulado, período completo</span></h3><div class="chartbox"><canvas id="ch_receb"></canvas></div></div>
     <div class="card"><h3>Aging da inadimplência <span class="hint">mês selecionado</span></h3><div class="chartbox"><canvas id="ch_aging"></canvas></div></div>
   </div>
   <div class="sp"></div>
@@ -245,7 +245,17 @@ function gauge(nivel, size=120){
   </svg><div class="glab" style="color:${cor}">${lab}</div>`;
 }
 function prep(e){ // caches derivados
-  e._recebMes={}; (e.receb||[]).forEach(r=>{const m=r.d.slice(0,7);e._recebMes[m]=(e._recebMes[m]||0)+r.v});
+  const mensal={};
+  // A base atual grava a série mensal. O fallback mantém compatibilidade com bases antigas.
+  if(Array.isArray(e.receb_mensal))e.receb_mensal.forEach(r=>{
+    if(/^\d{4}-\d{2}$/.test(r.m||'')&&Number.isFinite(Number(r.v))&&Number(r.v)>0)mensal[r.m]=(mensal[r.m]||0)+Number(r.v);
+  });
+  else (e.receb||[]).forEach(r=>{
+    const m=(r.d||'').slice(0,7), v=Number(r.v);
+    if(/^\d{4}-\d{2}$/.test(m)&&Number.isFinite(v)&&v>0)mensal[m]=(mensal[m]||0)+v;
+  });
+  e._recebMes=mensal;
+  e._recebMensal=Object.keys(mensal).sort().map(m=>({m,v:mensal[m]}));
   e._meses=Object.keys(e.kpi||{}).sort();
 }
 function kpiCard(lab,val,prev,fm){
@@ -396,10 +406,13 @@ function RE(){
     ...nomesIlg.map((nm,j)=>({label:'ILG '+nm,data:rz.map(r=>r.ilg[nm]??null),borderColor:CORES[j],backgroundColor:CORES[j]+'22',borderWidth:2,tension:.25,spanGaps:true})),
     {label:'LTV',data:rz.map(r=>r.ltv??null),borderColor:'#B3402E',borderDash:[6,4],borderWidth:2,tension:.25,spanGaps:true}]},
     {scales:{y:{ticks:{callback:v=>fmt(v,2)}}}},'Sem garantias, ILG ou LTV nesta emissão.');
-  // recebimentos diários
-  const rd=(e.receb||[]).filter(r=>r.d.slice(0,7)===m);
-  mkSafe('ch_receb','bar',{labels:rd.map(r=>r.d.slice(8)),datasets:[{label:'R$/dia',data:rd.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4}]},
-     {plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)}}}},'Sem recebimentos registrados para o mês selecionado.');
+  // Recebimentos mensais: barras do mês e linha do acumulado em todo o histórico.
+  const rm=e._recebMensal||[]; let recAcc=0;
+  const recAcum=rm.map(r=>{recAcc+=r.v;return recAcc});
+  mkSafe('ch_receb','bar',{labels:rm.map(r=>mmYY(r.m)),datasets:[
+    {label:'Recebido no mês',data:rm.map(r=>r.v),backgroundColor:'#155446CC',borderRadius:4},
+    {type:'line',label:'Recebido acumulado',data:recAcum,yAxisID:'y1',borderColor:'#B9892F',backgroundColor:'#B9892F',borderWidth:2,tension:.25,pointRadius:2}
+  ]},{scales:{y:{ticks:{callback:v=>fBRL(v)}},y1:{position:'right',ticks:{callback:v=>fBRL(v)},grid:{drawOnChartArea:false}}}},'Sem recebimentos mensais válidos para exibir.');
   // aging
   const bl=mets.filter(k=>/^inad /i.test(k));
   mkSafe('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:bl.map(b=>g(K,b)),backgroundColor:CORES.map(c=>c+'CC'),borderRadius:4}]},
@@ -443,7 +456,10 @@ function V(ws,r,c){const cell=ws[XLSX.utils.encode_cell({r:r-1,c:c-1})];return c
 function isDate(x){return x instanceof Date&&!isNaN(x)}
 function dstr(x){const p=n=>String(n).padStart(2,'0');return x.getFullYear()+'-'+p(x.getMonth()+1)+'-'+p(x.getDate())}
 function numJS(x){if(typeof x==='number')return x;
-  if(typeof x==='string'){const t=x.trim().replace(/[\s ]/g,'').replace(/\./g,'').replace(',','.');const f=parseFloat(t);return isNaN(f)?null:f}
+  if(typeof x==='string'){let t=x.trim().replace(/[\s ]/g,'');
+    if(t.includes(',')&&t.includes('.'))t=t.lastIndexOf(',')>t.lastIndexOf('.')?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');
+    else if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
+    const f=Number(t);return Number.isFinite(f)?f:null}
   return null}
 function parseConsolidado(wbk, fname){
   const S=wbk.Sheets;
@@ -471,7 +487,7 @@ function parseConsolidado(wbk, fname){
   const fc=Object.keys(flags).find(k=>/carteira/i.test(k)), fp=Object.keys(flags).find(k=>/pagamento cri/i.test(k));
   if(S['C']&&(fc||fp))for(let r=sc.c.first_row;r<sc.c.first_row+1200;r++){
     const d=V(S['C'],r,1); if(!isDate(d))continue; const val=numJS(V(S['C'],r,5)); if(val==null)continue;
-    if(fc&&V(S['C'],r,CL(flags[fc])+1)===1)receb.push({d:dstr(d),v:val});
+    if(fc&&V(S['C'],r,CL(flags[fc])+1)===1&&val>0)receb.push({d:dstr(d),v:val});
     if(fp&&V(S['C'],r,CL(flags[fp])+1)===1){const mm=dstr(d).slice(0,7);pag_cri[mm]=(pag_cri[mm]||0)+Math.abs(val)}}
   const integ=[]; const it=sc.integ||{first_row:3,rows:300};
   const IS=S['Integralização']||S['Integralizacao'];
@@ -494,9 +510,10 @@ function parseConsolidado(wbk, fname){
     const mmv=V(S['Obra'],r,CL(ob.cols.mes||'A')+1);
     const pc=numJS(V(S['Obra'],r,CL(ob.cols.pct||'B')+1)), md=numJS(V(S['Obra'],r,CL(ob.cols.medicao||'E')+1));
     if(isDate(mmv)&&(pc!=null||md!=null))obra.push({m:dstr(mmv).slice(0,7),pct:pc||0,med:md||0})}
+  const receb_mensal={}; receb.forEach(r=>{const mm=r.d.slice(0,7);receb_mensal[mm]=(receb_mensal[mm]||0)+r.v});
   const id=(titulo+'_'+nome).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
   return {id,nome:String(nome),titulo:String(titulo),arquivo:fname,gerado:new Date().toISOString().slice(0,10),
-    carac,series,players,kpi,receb,pag_cri,integ,receber_prev,obra,
+    carac,series,players,kpi,receb,receb_mensal:Object.keys(receb_mensal).sort().map(m=>({m,v:Math.round(receb_mensal[m]*100)/100})),pag_cri,integ,receber_prev,obra,
     orcamento:numJS(V(cfg,9,2))||0,farol_regras};
 }
 function validarEmissao(e,fname){
