@@ -54,7 +54,20 @@ label.flbl{font-size:12px;color:var(--ink-2)}
 .kpi .delta{font-size:12px;margin-top:4px;color:var(--ink-2)}
 .delta.pos{color:var(--green)} .delta.neg{color:var(--red)}
 .charts2{grid-template-columns:1fr 1fr}
+.portfolio-analysis{grid-template-columns:minmax(0,1.22fr) minmax(340px,.78fr);align-items:stretch}
+.portfolio-analysis>.card{display:flex;flex-direction:column;min-width:0}
+.portfolio-analysis .chartbox{flex:1;min-height:238px}
+.section-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:4px 0 10px}
+.section-intro h2{font-size:16px}
+.section-intro p{color:var(--ink-2);font-size:12px;text-align:right}
+.aging-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:-2px 0 12px}
+.aging-stat{background:#FBFAF7;border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.aging-stat .k{font-size:9px;letter-spacing:.9px;text-transform:uppercase;color:var(--ink-2);white-space:nowrap}
+.aging-stat .v{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aging-foot{font-size:11px;color:var(--ink-2);margin-top:8px;min-height:15px}
 @media(max-width:1100px){.charts2{grid-template-columns:1fr}.cards2{grid-template-columns:1fr}}
+@media(max-width:1100px){.portfolio-analysis{grid-template-columns:1fr}.section-intro{align-items:flex-start;flex-direction:column}.section-intro p{text-align:left}}
+@media(max-width:620px){.aging-summary{grid-template-columns:1fr}.aging-stat .k{white-space:normal}}
 .chartbox{position:relative;height:250px}
 .chartbox canvas{width:100%;height:100%}
 .empty{min-height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-2);background:#FBFAF7;border:1px dashed var(--line);border-radius:8px;padding:18px;font-size:12.5px;line-height:1.35}
@@ -142,9 +155,10 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
     <div class="card"><h3>Razões de garantia <span class="hint">ILG por série e LTV, linha do tempo</span></h3><div class="chartbox"><canvas id="ch_razoes"></canvas></div></div>
   </div>
   <div class="sp"></div>
-  <div class="grid charts2">
+  <div class="section-intro"><div><h2>Carteira e inadimplência</h2></div><p>Recebimentos no tempo e composição do saldo vencido no mês selecionado.</p></div>
+  <div class="grid portfolio-analysis">
     <div class="card"><h3>Recebimentos da carteira <span class="hint">mensal e acumulado, período completo</span></h3><div class="chartbox"><canvas id="ch_receb"></canvas></div></div>
-    <div class="card"><h3>Aging da inadimplência <span class="hint">mês selecionado</span></h3><div class="chartbox"><canvas id="ch_aging"></canvas></div></div>
+    <div class="card"><h3>Aging da inadimplência <span class="hint">mês selecionado</span></h3><div class="aging-summary" id="aging-summary"></div><div class="chartbox"><canvas id="ch_aging"></canvas></div><div class="aging-foot" id="aging-foot"></div></div>
   </div>
   <div class="sp"></div>
   <div class="grid charts2">
@@ -414,9 +428,22 @@ function RE(){
     {type:'line',label:'Recebido acumulado',data:recAcum,yAxisID:'y1',borderColor:'#B9892F',backgroundColor:'#B9892F',borderWidth:2,tension:.25,pointRadius:2}
   ]},{scales:{y:{ticks:{callback:v=>fBRL(v)}},y1:{position:'right',ticks:{callback:v=>fBRL(v)},grid:{drawOnChartArea:false}}}},'Sem recebimentos mensais válidos para exibir.');
   // aging
-  const bl=mets.filter(k=>/^inad /i.test(k));
-  mkSafe('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:bl.map(b=>g(K,b)),backgroundColor:CORES.map(c=>c+'CC'),borderRadius:4}]},
-     {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}},'Sem abertura de inadimplência para o mês selecionado.');
+  const ordemAging=['ate 30','31 a 60','61 a 90','91 a 120','121 a 180','181 a 360','acima de 360','361 a'];
+  const bl=mets.filter(k=>/^inad /i.test(k)&&!/parcelas/i.test(k)).sort((a,b)=>{
+    const ia=ordemAging.findIndex(x=>norm(a).toLowerCase().includes(x));
+    const ib=ordemAging.findIndex(x=>norm(b).toLowerCase().includes(x));
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  const vals=bl.map(b=>g(K,b)||0), totalAging=vals.reduce((a,v)=>a+v,0);
+  const acima30=bl.reduce((a,b,j)=>a+(norm(b).toLowerCase().includes('ate 30')?0:vals[j]),0);
+  const acima90=bl.reduce((a,b,j)=>a+(/91 a|121 a|181 a|acima|361 a/i.test(norm(b))?vals[j]:0),0);
+  document.getElementById('aging-summary').innerHTML=totalAging?[
+    ['Saldo vencido',fBRL(totalAging)],['Acima de 30 dias',fBRL(acima30)],['Acima de 90 dias',fBRL(acima90)]
+  ].map(([k,v])=>`<div class="aging-stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join(''):'';
+  document.getElementById('aging-foot').textContent=totalAging?`${fmt(acima90/totalAging*100,1)}% do saldo vencido está acima de 90 dias · referência ${mmYY(m)}`:'';
+  const agingCores=['#2F7D64','#73A942','#B4A13A','#D69532','#D16B32','#BF4938','#8F2D2D'];
+  mkSafe('ch_aging','bar',{labels:bl.map(b=>b.replace(/^inad /i,'')),datasets:[{label:'R$',data:vals,backgroundColor:bl.map((_,i)=>(agingCores[i]||agingCores.at(-1))+'DD'),borderRadius:5,barPercentage:.72}]},
+     {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{callback:v=>fBRL(v)}},y:{grid:{display:false}}}},'Sem abertura de inadimplência para o mês selecionado.');
   // obra
   const ob=e.obra||[]; let acc=0;
   const obAcc=ob.map(o=>{acc+=o.pct;return{m:o.m,acc:Math.min(acc,1),med:o.med}});
@@ -483,6 +510,29 @@ function parseConsolidado(wbk, fname){
     const s=V(S['BD_KPI'],r,1); if(s==null)break;
     const mnm=V(S['BD_KPI'],r,2), v=numJS(V(S['BD_KPI'],r,3));
     if(isDate(s)&&mnm&&v!=null){const mm=dstr(s).slice(0,7);(kpi[mm]=kpi[mm]||{})[String(mnm)]=v}}
+  if(S['BD_Inadimplencia']){
+    const ws=S['BD_Inadimplencia'], ref=XLSX.utils.decode_range(ws['!ref']||'A1');
+    const heads=[]; for(let c=0;c<=ref.e.c;c++)heads.push(norm(V(ws,1,c+1)).toLowerCase());
+    const ci=(...res)=>heads.findIndex(h=>res.some(re=>re.test(h)))+1;
+    const cd=ci(/^data do relatorio$/, /^safra$/), cf=ci(/periodo de atraso/, /faixa.*atraso/, /^faixa$/),
+          cdi=ci(/dias de atraso/), cv=ci(/^valor em atraso$/, /valor.*inadimpl/), cp=ci(/parcelas em aberto/);
+    const buckets={};
+    const faixaNome=(faixa,dias)=>{const t=norm(faixa).toLowerCase(),ns=(t.match(/\d+/g)||[]).map(Number);
+      if(/acima|maior/.test(t)||(t.includes('+')&&ns.length))return 'Inad Acima de 360 dias';
+      let a=ns[0],b=ns[1]; if(!(a&&b)){const d=numJS(dias);if(!d||d<=0)return null;
+        [a,b]=d<=30?[1,30]:d<=60?[31,60]:d<=90?[61,90]:d<=120?[91,120]:d<=180?[121,180]:d<=360?[181,360]:[361,99999]}
+      if(b<=30)return 'Inad Ate 30 dias'; if(a<=60&&b<=60)return 'Inad De 31 a 60 dias';
+      if(a<=90&&b<=90)return 'Inad De 61 a 90 dias'; if(a<=120&&b<=120)return 'Inad De 91 a 120 dias';
+      if(a<=180&&b<=180)return 'Inad De 121 a 180 dias'; if(a<=360&&b<=360)return 'Inad De 181 a 360 dias';
+      return 'Inad Acima de 360 dias'};
+    if(cd&&cv)for(let r=2;r<=ref.e.r+1;r++){const d=V(ws,r,cd),v=numJS(V(ws,r,cv));if(!isDate(d)||v==null||v<=0)continue;
+      const mm=dstr(d).slice(0,7),fn=faixaNome(cf?V(ws,r,cf):null,cdi?V(ws,r,cdi):null);if(!fn)continue;
+      const x=buckets[mm]=buckets[mm]||{faixas:{},parcelas:0};x.faixas[fn]=(x.faixas[fn]||0)+v;x.parcelas+=cp?(numJS(V(ws,r,cp))||0):0}
+    Object.entries(buckets).forEach(([mm,x])=>{const dest=kpi[mm]=kpi[mm]||{};
+      Object.entries(x.faixas).forEach(([fn,v])=>{if(dest[fn]==null)dest[fn]=Math.round(v*100)/100});
+      if(dest['Inadimplencia (R$)']==null)dest['Inadimplencia (R$)']=Math.round(Object.values(x.faixas).reduce((a,v)=>a+v,0)*100)/100;
+      if(x.parcelas&&dest['Inadimplencia (parcelas)']==null)dest['Inadimplencia (parcelas)']=Math.round(x.parcelas)})
+  }
   const receb=[], pag_cri={}; const flags=(sc.c||{}).flags||{};
   const fc=Object.keys(flags).find(k=>/carteira/i.test(k)), fp=Object.keys(flags).find(k=>/pagamento cri/i.test(k));
   if(S['C']&&(fc||fp))for(let r=sc.c.first_row;r<sc.c.first_row+1200;r++){
