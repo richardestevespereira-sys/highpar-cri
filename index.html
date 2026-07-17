@@ -137,6 +137,41 @@ canvas{max-width:100%}
 .grid2 .card{margin-top:0}
 @media(max-width:900px){.grid2{grid-template-columns:1fr}.em-row{grid-template-columns:1fr 1fr;row-gap:10px}}
 .footer-note{color:var(--muted);font-size:11.5px;margin-top:26px;line-height:1.6}
+/* ---------- one-pager (lâmina de 1 página) ---------- */
+.op{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);max-width:860px;margin:0 auto;overflow:hidden}
+.op-head{background:linear-gradient(150deg,var(--brand),var(--brand-ink));color:#fff;padding:18px 26px;display:flex;align-items:center;gap:16px;border-bottom:3px solid var(--gold)}
+.op-head img{height:20px}
+.op-head .tt{font:700 24px/1.1 'Cormorant Garamond',Georgia,serif}
+.op-head .cods{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.op-head .chip{background:rgba(255,255,255,.14);color:#DDE6F0}
+.op-score{margin-left:auto;text-align:center;background:rgba(255,255,255,.1);border-radius:12px;padding:8px 16px}
+.op-score .n{font:700 26px/1 Poppins}
+.op-score .c{font:600 10px Inter;letter-spacing:.06em;margin-top:3px}
+.op-body{padding:18px 26px 8px}
+.op-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
+.op-kpi{border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
+.op-kpi .l{font:500 9.5px Inter;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.op-kpi .v{font:700 16px Poppins;margin-top:2px}
+.op-kpi.ok .v{color:var(--ok)} .op-kpi.warn .v{color:var(--warn)} .op-kpi.bad .v{color:var(--bad)}
+.op-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:14px}
+.op-sec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.op-sec h4{margin:0 0 6px;font:600 11px Inter;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.op-sec .tb{font-size:11px}
+.op-sec .tb th,.op-sec .tb td{padding:4px 6px}
+.op-facts{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:11px}
+.op-facts .l{color:var(--muted);font-size:9.5px}
+.op-facts .v{font-weight:600}
+.op-chart{position:relative;height:150px}
+.op-foot{padding:8px 26px 14px;color:var(--muted);font-size:9.5px;border-top:1px solid var(--line)}
+.op-gar{display:flex;flex-wrap:wrap;gap:5px}
+.op-gar .chip{font-size:10px}
+@media print{
+  .op{border:none;box-shadow:none;max-width:none;border-radius:0}
+  .op-kpis{grid-template-columns:repeat(6,1fr)}
+  .op-chart{height:130px}
+  .op-body{padding:12px 0 0}
+  .op-foot{padding:6px 0}
+}
 /* ---------- impressão (Exportar PDF da lâmina) ---------- */
 @media print{
   body{background:#fff}
@@ -436,6 +471,7 @@ function router(){
   $('#nav-emis').classList.toggle('on',!h.startsWith('#/radar'));
   $('#nav-radar').classList.toggle('on',h.startsWith('#/radar'));
   renderAvisos();
+  if(h.startsWith('#/onepager/')) return renderOnepager(decodeURIComponent(h.split('/')[2]));
   if(h.startsWith('#/emissao/')) return renderLamina(decodeURIComponent(h.split('/')[2]));
   if(h==='#/radar') return renderRadar();
   renderHome();
@@ -530,7 +566,8 @@ function renderLamina(id){
         ${gaps.length?`<span class="chip gap-chip" title="Faltando: ${esc(gaps.join(', '))}">⚠ dados incompletos (${gaps.length})</span>`:''}
       </div></div>
     <div class="no-print" style="margin-left:auto;display:flex;gap:8px">
-      <button class="btn" onclick="window.print()">⤓ Exportar PDF da lâmina</button>
+      <button class="btn" onclick="location.hash='#/onepager/${id}'">🗎 Lâmina 1 página</button>
+      <button class="btn" onclick="window.print()">⤓ PDF completo</button>
     </div></div>
   <div class="tabs no-print">${tabs.map(([t,l])=>`<button class="${TAB===t?'on':''}" onclick="TAB='${t}';renderLamina('${id}')">${l}</button>`).join('')}</div>
   <div id="panes"></div>
@@ -666,6 +703,112 @@ function pedidoVerificacao(id,i){
   navigator.clipboard.writeText(txt).then(()=>alert('Pedido de verificação copiado — cole no e-mail para a securitizadora/servicer.'));
 }
 
+/* ================= ONE-PAGER (tudo que importa em 1 página A4) ================= */
+function renderOnepager(id){
+  const e=emisPorId(id); if(!e){location.hash='#/';return;}
+  const mU=ultimoMesKpi(e), k=(e.kpi||{})[mU]||{}, sc=scoreRisco(e), pos=posicaoHighpar(e);
+  const cm=carteiraMes(e), fx=(e.inad_faixas||[]).slice(-1)[0];
+  const obraAc=(e.obra||[]).reduce((a,o)=>a+(o.pct||0),0);
+  const ilg1=(e.series||[])[0]?ilgSerie(e,k,e.series[0]):null, ltv=ltvEmis(e,k);
+  const bnd=(v,verde,amar,maior=true)=>v==null?'':' '+(bandaDefault(v,verde,amar,maior)||'');
+  const venc=((e.carac||[]).find(c=>/vencimento/.test(norm(c.k)))||{}).v;
+  const covs=(e.covenants||[]).map(c=>({c,st:statusCovenant(c)}));
+  const covPend=covs.filter(x=>x.st.cls!=='ok');
+  $('#app').innerHTML=`
+  <div class="no-print" style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="btn" onclick="location.hash='#/emissao/${id}'">← Lâmina completa</button>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn" onclick="baixarSnapshot('${id}')">💾 Guardar dados do mês (arquivo)</button>
+      <button class="btn primary" onclick="window.print()">⤓ Imprimir / salvar PDF</button>
+    </div></div>
+  <div class="op">
+    <div class="op-head">
+      <div><div style="display:flex;align-items:center;gap:12px"><img src="HIGHPAR-LOGO.svg" alt="Highpar" onerror="this.remove()"><span class="tt">${esc(tituloEmis(e))}</span></div>
+        <div class="cods">${(e.series||[]).map(s=>s.cod_if&&s.cod_if!=='PREENCHER'?`<span class="chip">IF ${esc(s.cod_if)}</span>`:'').join('')}
+        <span class="chip">Base: ${fmtM(mU)}</span><span class="chip">${esc(e.status||'Ativa')}</span></div></div>
+      <div class="op-score"><div class="n">${sc.nota??'—'}</div><div class="c">${esc(sc.classe)}</div></div>
+    </div>
+    <div class="op-body">
+      <div class="op-kpis">
+        <div class="op-kpi ${bandaDefault(ilg1,1.4,1.3)||''}"><div class="l">ILG Sênior</div><div class="v num">${fmtX(ilg1)}</div></div>
+        <div class="op-kpi ${bandaDefault(ltv,.6,.7,false)||''}"><div class="l">LTV</div><div class="v num">${fmtPct(ltv)}</div></div>
+        <div class="op-kpi ${cm?(bandaDefault(cm.ratio,.8,.5)||''):''}"><div class="l">Carteira mês</div><div class="v num">${cm?fmtPct(cm.ratio):'—'}</div></div>
+        <div class="op-kpi ${fx?(bandaDefault(fx.p30,.05,.10,false)||''):''}"><div class="l">Inad &gt;30d</div><div class="v num">${fx?fmtPct(fx.p30):'—'}</div></div>
+        <div class="op-kpi"><div class="l">Obra</div><div class="v num">${obraAc?fmtPct(obraAc):'—'}</div></div>
+        <div class="op-kpi ${e.dossie?(e.dossie.score_documental>=70?'ok':e.dossie.score_documental>=40?'warn':'bad'):''}"><div class="l">Dossiê</div><div class="v num">${e.dossie?(e.dossie.score_documental??'—'):'—'}</div></div>
+      </div>
+      <div class="op-grid">
+        <div>
+          <div class="op-sec"><h4>Recebimentos da carteira × esperado</h4><div class="op-chart"><canvas id="op-receb"></canvas></div></div>
+          <div class="op-sec"><h4>Fluxo do investidor (aportes × retornos)</h4><div class="op-chart"><canvas id="op-fluxo"></canvas></div></div>
+          <div class="op-sec"><h4>Covenants em aberto (${covPend.length} de ${covs.length})</h4>
+            <table class="tb">${covPend.slice(0,5).map(x=>`<tr><td>${esc(x.c.nome)}</td><td style="width:120px"><span class="pill ${x.st.cls}" style="font-size:10px"><span class="dot"></span>${esc(x.st.txt)}</span></td></tr>`).join('')||'<tr><td style="color:var(--ok)">Todos em dia ✓</td></tr>'}</table></div>
+        </div>
+        <div>
+          <div class="op-sec"><h4>A emissão em resumo</h4><div class="op-facts">
+            ${(e.carac||[]).filter(c=>/emiss|vencimento|liquida|pu inicial|indexador|s[eé]ries|or[cç]amento/.test(norm(c.k))).slice(0,8).map(c=>{
+              let v=c.v; if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v))v=fmtD(v); else if(typeof v==='number')v=/orcamento/.test(norm(c.k))?fmtBRLc(v):fmtInt(v);
+              return `<div><div class="l">${esc(c.k)}</div><div class="v">${esc(v)}</div></div>`;}).join('')}
+          </div></div>
+          <div class="op-sec"><h4>Séries e saldo devedor (${fmtM(mU)})</h4>
+            <table class="tb"><tr><th>Série</th><th>Taxa</th><th class="r">Saldo</th></tr>
+            ${(e.series||[]).map(s=>`<tr><td><b>${esc(s.nome||'—')}</b></td><td class="num">${s.taxa!=null?fmtPct(s.taxa,2):'—'}</td><td class="r num">${fmtBRLc(valDividaSerie(k,s.nome||''))}</td></tr>`).join('')}</table></div>
+          ${pos&&pos.tot?`<div class="op-sec"><h4>Posição Highpar</h4><table class="tb">
+            ${pos.linhas.filter(l=>l.valor).map(l=>`<tr><td>${esc(l.nome)}</td><td class="num">${fmtPct(l.pct)}</td><td class="r num">${fmtBRLc(l.valor)}</td></tr>`).join('')}
+            <tr><td><b>Total (${fmtPct(pos.pctAtivo)} do ativo)</b></td><td></td><td class="r num"><b>${fmtBRLc(pos.tot)}</b></td></tr></table></div>`:''}
+          <div class="op-sec"><h4>Garantias da operação</h4><div class="op-gar">
+            ${(e.garantias||[]).map(g=>`<span class="chip ${/vigente/.test(norm(g.status||''))?'brand':''}">${esc(g.nome)}</span>`).join('')||'—'}</div></div>
+          <div class="op-sec"><h4>Obra</h4><div class="op-chart" style="height:110px"><canvas id="op-obra"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="op-foot">Lâmina resumida gerada pelo Portal de Monitoramento Highpar em ${HOJE.toLocaleDateString('pt-BR')} · base ${fmtM(mU)} ·
+    material interno — não substitui a leitura dos documentos da operação. Índices calculados pelo portal a partir dos dados brutos do consolidado.</div>
+  </div>`;
+  // mini-gráficos (12 últimos meses)
+  const m12=[...new Set([...(e.receb_mensal||[]).map(r=>r.m),...Object.keys(e.receber_prev||{})])].sort().slice(-12);
+  const c1=$('#op-receb');
+  if(c1&&m12.length)novoChart(c1,{type:'bar',data:{labels:m12.map(fmtM),datasets:[
+    {label:'Recebido',data:m12.map(m=>(((e.receb_mensal||[]).find(r=>r.m===m))||{}).v||0),backgroundColor:CORES.brand},
+    {label:'Esperado',data:m12.map(m=>(e.receber_prev||{})[m]||0),backgroundColor:'#E6C89C'}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:9}}}},
+    scales:{y:{ticks:{font:{size:8},callback:v=>fmtBRLc(v)}},x:{grid:{display:false},ticks:{font:{size:8}}}}}});
+  const mesesF=[...new Set([...(e.integ||[]).map(i=>i.d.slice(0,7)),...Object.keys(e.pag_cri||{})])].sort();
+  const c2=$('#op-fluxo');
+  if(c2&&mesesF.length){let acc=0;
+    const ap=mesesF.map(m=>(e.integ||[]).filter(i=>i.d.startsWith(m)).reduce((a,i)=>a+i.v,0));
+    const rt=mesesF.map(m=>(e.pag_cri||{})[m]||0);
+    const liq=mesesF.map((m,i)=>{acc+=rt[i]-ap[i];return acc;});
+    novoChart(c2,{type:'bar',data:{labels:mesesF.map(fmtM),datasets:[
+      {label:'Aportes',data:ap.map(v=>-v),backgroundColor:'#A9BCD6'},
+      {label:'Retornos',data:rt,backgroundColor:CORES.brand},
+      {label:'Acumulado',data:liq,type:'line',borderColor:CORES.gold,backgroundColor:CORES.gold,pointRadius:0,borderWidth:1.5,tension:.25}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:9}}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:8}}},y:{stacked:true,ticks:{font:{size:8},callback:v=>fmtBRLc(v)}}}}});}
+  const c3=$('#op-obra');
+  if(c3&&(e.obra||[]).length){let a2=0;const o=e.obra;const ac=o.map(x=>{a2+=x.pct||0;return a2*100;});
+    novoChart(c3,{type:'line',data:{labels:o.map(x=>fmtM(x.m)),datasets:[
+      {label:'% acumulado',data:ac,borderColor:CORES.brand,backgroundColor:'rgba(27,54,93,.08)',fill:true,pointRadius:0,borderWidth:1.5,tension:.25}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:8},callback:v=>v+'%'}},x:{grid:{display:false},ticks:{font:{size:8}}}}}});}
+}
+/* snapshot do mês: guarda as informações-chave num arquivo (histórico auditável) */
+function baixarSnapshot(id){
+  const e=emisPorId(id); const mU=ultimoMesKpi(e); const k=(e.kpi||{})[mU]||{};
+  const sc=scoreRisco(e), cm=carteiraMes(e), fx=(e.inad_faixas||[]).slice(-1)[0], pos=posicaoHighpar(e);
+  const snap={tipo:'resumo-mensal-cri',versao:'v4',gerado:new Date().toISOString(),emissao:tituloEmis(e),id:e.id,mes_base:mU,
+    score:{nota:sc.nota,classe:sc.classe,por_categoria:sc.detalhe,drivers:sc.drivers},
+    indicadores:{ilg_por_serie:(e.series||[]).map(s=>({serie:s.nome,ilg:ilgSerie(e,k,s)})),ltv:ltvEmis(e,k),
+      carteira_mes:cm,inad_maior30d:fx?fx.p30:null,obra_acumulada:(e.obra||[]).reduce((a,o)=>a+(o.pct||0),0)},
+    series:(e.series||[]).map(s=>({...s,saldo_devedor:valDividaSerie(k,s.nome||'')})),
+    posicao_highpar:pos?{total:pos.tot,pct_ativo:pos.pctAtivo,linhas:pos.linhas}:null,
+    covenants:(e.covenants||[]).map(c=>({nome:c.nome,criticidade:c.criticidade,status:statusCovenant(c).txt})),
+    dossie:e.dossie?{score:e.dossie.score_documental,obrigatorios:e.dossie.obrigatorios_presentes}:null,
+    kpi_do_mes:k};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(snap,null,2)],{type:'application/json'}));
+  a.download=`resumo_${e.id}_${mU||'sem-safra'}.json`; a.click();
+}
 /* ================= charts da lâmina ================= */
 function montarChartsLamina(e){
   const elF=$('#ch-fluxo');
