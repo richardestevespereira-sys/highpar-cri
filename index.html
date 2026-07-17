@@ -9,30 +9,50 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Highpar — Monitoramento de CRIs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{
-  --ink:#141A17; --muted:#5F6963; --line:#E5E8E5; --paper:#FFFFFF; --bg:#F7F8F7;
-  --brand:#12463A; --brand-ink:#0D332B; --brand-soft:#EAF1EE; --brand-line:#CBDCD5;
+:root{ /* identidade Highpar (highpar.com.br): azul-marinho + dourado, serifa nos títulos */
+  --ink:#1A2233; --muted:#5C6470; --line:#E3E6EA; --paper:#FFFFFF; --bg:#F6F7F9;
+  --brand:#1B365D; --brand-ink:#12263F; --brand-soft:#E9EEF5; --brand-line:#C6D2E2;
+  --gold:#CE8B42; --gold-soft:#F7ECDD;
   --ok:#177A45; --ok-bg:#E7F4EC; --warn:#96660A; --warn-bg:#FBF1DB; --bad:#B3402E; --bad-bg:#FBE9E5;
-  --chip:#EFF1EF; --shadow:0 1px 2px rgba(20,26,23,.05),0 8px 24px -12px rgba(20,26,23,.12);
+  --chip:#EEF0F3; --shadow:0 1px 2px rgba(18,38,63,.05),0 8px 24px -12px rgba(18,38,63,.14);
 }
 *{box-sizing:border-box} html{scroll-behavior:smooth}
 body{margin:0;font:400 14px/1.55 Inter,system-ui,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--bg)}
 h1,h2,h3{font-family:Poppins,Inter,sans-serif;font-weight:600;margin:0}
+h1,.em-row .t{font-family:'Cormorant Garamond',Georgia,serif;font-weight:700;letter-spacing:.005em}
 a{color:var(--brand);text-decoration:none}
 .num{font-variant-numeric:tabular-nums}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
-/* ---------- topo ---------- */
-.topbar{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50}
+/* ---------- topo (navy Highpar, logo branca) ---------- */
+.topbar{background:var(--brand);border-bottom:3px solid var(--gold);position:sticky;top:0;z-index:50}
 .topbar .wrap{display:flex;align-items:center;gap:26px;height:62px}
-.logo{height:26px;display:block}
+.logo{height:24px;display:block}
 .nav{display:flex;gap:4px;margin-left:6px}
-.nav a{padding:8px 14px;border-radius:8px;color:var(--muted);font-weight:500}
-.nav a.on{color:var(--brand-ink);background:var(--brand-soft)}
-.top-actions{margin-left:auto;display:flex;gap:10px}
+.nav a{padding:8px 14px;border-radius:8px;color:#C9D4E3;font-weight:500}
+.nav a.on{color:#fff;background:rgba(255,255,255,.13)}
+.top-actions{margin-left:auto;display:flex;gap:10px;align-items:center}
+.topbar .btn{background:transparent;border-color:rgba(255,255,255,.4);color:#fff}
+.topbar .btn:hover{border-color:var(--gold);color:var(--gold)}
+.topbar .btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brand-ink)}
+.topbar .btn.primary:hover{background:#B87834;color:#fff}
+.bell{position:relative}
+.bell .n{position:absolute;top:-6px;right:-6px;background:var(--bad);color:#fff;border-radius:99px;font:700 10px Inter;padding:1px 5px;display:none}
+/* avisos dinâmicos: somem sozinhos quando o dado é corrigido */
+.toasts{position:fixed;right:18px;bottom:18px;z-index:200;display:flex;flex-direction:column;gap:10px;max-width:360px}
+.toast{background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:11px;box-shadow:var(--shadow);padding:11px 14px;font-size:12.5px;animation:tin .25s ease}
+.toast.bad{border-left-color:var(--bad)} .toast.ok{border-left-color:var(--ok)}
+.toast .x{float:right;border:none;background:none;cursor:pointer;color:var(--muted)}
+@keyframes tin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.avisos-panel{position:fixed;top:70px;right:24px;z-index:150;width:400px;max-height:70vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:none}
+.avisos-panel.show{display:block}
+.avisos-panel .ap-h{padding:12px 16px;border-bottom:1px solid var(--line);font:600 13px Poppins}
+.avisos-panel .ap-i{padding:10px 16px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.avisos-panel .ap-i:last-child{border-bottom:none}
+body.embed .topbar,body.embed .banner,body.embed .toasts,body.embed .avisos-panel{display:none!important}
 .btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:9px;padding:8px 14px;font:500 13px Inter;cursor:pointer;transition:.15s}
 .btn:hover{border-color:var(--brand);color:var(--brand)}
 .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
@@ -141,9 +161,12 @@ canvas{max-width:100%}
     <div class="top-actions">
       <button class="btn" onclick="abrirModal('m-novo')">＋ Cadastrar novo CRI</button>
       <button class="btn primary" onclick="abrirModal('m-up')">⬆ Atualizar por upload</button>
+      <button class="btn bell" onclick="toggleAvisos()" title="Avisos">🔔<span class="n" id="bell-n"></span></button>
     </div>
   </div>
 </header>
+<div class="avisos-panel" id="avisos-panel"><div class="ap-h">Avisos do monitoramento</div><div id="avisos-lista"></div></div>
+<div class="toasts" id="toasts"></div>
 
 <main class="wrap page" id="app"></main>
 
@@ -203,7 +226,7 @@ const fmtInt = v => v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigit
 const fmtD = s => {if(!s)return '—';const [a,m,d]=String(s).split('-');return d?`${d}/${m}/${a}`:`${m}/${a}`;};
 const fmtM = s => {if(!s)return '—';const [a,m]=String(s).split('-');return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m-1]+'/'+a.slice(2);};
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const CORES = {brand:'#12463A', brand2:'#3E7A6A', gold:'#8C6D1F', ok:'#177A45', warn:'#B37F16', bad:'#B3402E'};
+const CORES = {brand:'#1B365D', brand2:'#4B6C99', gold:'#CE8B42', ok:'#177A45', warn:'#B37F16', bad:'#B3402E'};
 Chart.defaults.font.family='Inter'; Chart.defaults.color='#5F6963'; Chart.defaults.borderColor='#E5E8E5';
 let charts=[]; const novoChart=(ctx,cfg)=>{const c=new Chart(ctx,cfg);charts.push(c);return c;};
 const limparCharts=()=>{charts.forEach(c=>c.destroy());charts=[];};
@@ -339,6 +362,65 @@ function nivelRisco(e){
   if(bands.includes('warn')) return {txt:'MÉDIO',cls:'warn'};
   return {txt:'BAIXO',cls:'ok'};
 }
+/* ---- score ponderado de risco (categorização): 0-100 por emissão ----
+   Pesos por categoria; banda ok=100, amarelo=50, vermelho=0; Documental combina
+   status dos covenants com o score do dossiê (diagnostico.py). */
+const PESOS={'Índices de Garantia':.30,'Carteira':.20,'Inadimplência':.15,'Liquidez':.10,'Obra':.05,'Documental':.20};
+function scoreRisco(e){
+  const porCat={};
+  linhasRadar(e).forEach(l=>{if(l.band){(porCat[l.cat]=porCat[l.cat]||[]).push({ok:100,warn:50,bad:0}[l.band]);}});
+  if(e.dossie&&e.dossie.score_documental!=null){(porCat['Documental']=porCat['Documental']||[]).push(e.dossie.score_documental);}
+  let soma=0,pesoTot=0;const detalhe={};
+  for(const cat in porCat){const media=porCat[cat].reduce((a,b)=>a+b,0)/porCat[cat].length;
+    const p=PESOS[cat]??.05; soma+=media*p; pesoTot+=p; detalhe[cat]=Math.round(media);}
+  if(!pesoTot) return {nota:null,classe:'S/ DADO',cls:'mut',detalhe:{},drivers:[]};
+  const nota=Math.round(soma/pesoTot);
+  const cl= nota>=85?['A — Risco Baixo','ok']: nota>=65?['B — Risco Médio','warn']: nota>=40?['C — Risco Alto','bad']:['D — Risco Crítico','bad'];
+  const drivers=linhasRadar(e).filter(l=>l.band==='bad').map(l=>l.ind);
+  if(e.dossie&&e.dossie.score_documental!=null&&e.dossie.score_documental<70)drivers.push(`Dossiê documental ${e.dossie.score_documental}/100`);
+  return {nota,classe:cl[0],cls:cl[1],detalhe,drivers};
+}
+/* ---- avisos dinâmicos: derivados do ESTADO — quando você corrige (preenche
+   cadastro, roda o pipeline), o aviso deixa de ser gerado e some sozinho. ---- */
+function hashAviso(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return 'a'+(h>>>0).toString(36);}
+function gerarAvisos(){
+  const out=[];
+  const idade=m=>{if(!m)return 999;const [a,mm]=m.split('-').map(Number);return (HOJE.getFullYear()-a)*12+(HOJE.getMonth()+1-mm);};
+  BASE.emissoes.forEach(e=>{
+    const nome=tituloEmis(e);
+    (e.covenants||[]).forEach(c=>{const st=statusCovenant(c);
+      if(st.cls!=='ok')out.push({cls:st.cls==='bad'?'bad':'warn',t:`${nome}: covenant "${c.nome}" — ${st.txt}.`});});
+    const d=e.dossie;
+    if(d){const falt=(d.itens||[]).filter(i=>i.obrigatorio&&i.status!=='presente');
+      if(falt.length)out.push({cls:falt.some(i=>i.status==='ausente')?'bad':'warn',
+        t:`${nome}: dossiê ${d.score_documental??'—'}/100 — ${falt.length} documento(s) obrigatório(s) pendente(s) (${falt.slice(0,3).map(i=>i.nome.split('(')[0].trim()).join('; ')}${falt.length>3?'…':''}).`});
+      (d.itens||[]).filter(i=>i.status==='desatualizado').forEach(i=>out.push({cls:'warn',
+        t:`${nome}: "${i.nome}" desatualizado (último: ${fmtM(i.mais_recente)}).`}));}
+    const mU=ultimoMesKpi(e);
+    if(idade(mU)>1)out.push({cls:idade(mU)>2?'bad':'warn',t:`${nome}: consolidado com última safra ${fmtM(mU)} — rodar o mês (atualizar_mes.bat).`});
+    const pos=posicaoHighpar(e);
+    if(pos&&!pos.preenchida)out.push({cls:'warn',t:`${nome}: posição Highpar não preenchida (cadastro/${e.id}.json).`});
+  });
+  return out.map(a=>({...a,id:hashAviso(a.t)}));
+}
+let AVISOS=[];
+const STORE=(()=>{try{localStorage.setItem('__t','1');localStorage.removeItem('__t');return localStorage;}
+  catch(_){const m={};return {getItem:k=>(k in m?m[k]:null),setItem:(k,v)=>{m[k]=String(v);},removeItem:k=>{delete m[k];}};}})();
+function renderAvisos(){
+  AVISOS=gerarAvisos();
+  const disp=JSON.parse(STORE.getItem('hp_toast_disp')||'{}');
+  const n=$('#bell-n');if(n){n.textContent=AVISOS.length;n.style.display=AVISOS.length?'inline-block':'none';}
+  const L=$('#avisos-lista');
+  if(L)L.innerHTML=AVISOS.map(a=>`<div class="ap-i"><span class="pill ${a.cls}" style="flex:none;margin-top:1px"><span class="dot"></span>${a.cls==='bad'?'crítico':'atenção'}</span><span>${esc(a.t)}</span></div>`).join('')||'<div class="ap-i">Nenhum aviso — tudo em dia. ✓</div>';
+  const T=$('#toasts');
+  if(T&&!T.dataset.done){T.dataset.done=1;
+    AVISOS.filter(a=>!disp[a.id]).slice(0,3).forEach(a=>{
+      const d=document.createElement('div');d.className='toast '+a.cls;
+      d.innerHTML=`<button class="x">✕</button>${esc(a.t)}`;
+      d.querySelector('.x').onclick=()=>{disp[a.id]=1;STORE.setItem('hp_toast_disp',JSON.stringify(disp));d.remove();};
+      T.appendChild(d);setTimeout(()=>d.remove(),9000);});}
+}
+function toggleAvisos(){$('#avisos-panel').classList.toggle('show');}
 function gapsEmis(e){
   const v=e.validacao||{}; const nomes={carac:'características',series:'séries',players:'players',kpi:'KPIs',receb_mensal:'recebimentos',
     pag_cri:'pagamentos ao CRI',integ:'integralizações',receber_prev:'carteira esperada',obra:'obra',inad_faixas:'inadimplência',
@@ -353,6 +435,7 @@ function router(){
   const h=location.hash||'#/';
   $('#nav-emis').classList.toggle('on',!h.startsWith('#/radar'));
   $('#nav-radar').classList.toggle('on',h.startsWith('#/radar'));
+  renderAvisos();
   if(h.startsWith('#/emissao/')) return renderLamina(decodeURIComponent(h.split('/')[2]));
   if(h==='#/radar') return renderRadar();
   renderHome();
@@ -387,7 +470,7 @@ function renderHome(){
       <div class="em-cell"><div class="l">Lastro (últ. safra)</div><div class="v num">${fmtBRLc(saldo)}</div></div>
       <div class="em-cell"><div class="l">Obra</div><div class="v num">${obraAc?fmtPct(obraAc):'—'}</div></div>
       <div class="em-cell"><div class="l">Posição Highpar</div><div class="v num">${pos&&pos.tot?fmtBRLc(pos.tot)+' ('+fmtPct(pos.pctAtivo)+')':'—'}</div></div>
-      <div style="text-align:right"><span class="pill ${r.cls}"><span class="dot"></span>Risco ${r.txt}</span><div class="em-go" style="margin-top:6px">ver lâmina →</div></div>
+      <div style="text-align:right">${(()=>{const sc=scoreRisco(e);return `<span class="pill ${sc.cls}" title="${esc((sc.drivers||[]).join(' · ')||'sem apontamentos')}"><span class="dot"></span>${sc.nota!=null?sc.nota+' · ':''}${sc.classe}</span>`;})()}<div class="em-go" style="margin-top:6px">ver lâmina →</div></div>
     </div>`;}).join('')}
   </div>
   <div class="footer-note">O <b>Radar de Risco</b> (faixas verde/amarelo/vermelho, estilo painel de risco) fica fora da lâmina — veja o menu.
@@ -408,8 +491,8 @@ function renderRadar(){
   <div class="page-head"><h1>Radar de Risco</h1><div class="sub">Visão externa à lâmina — indicadores por emissão com faixas (regras da própria emissão quando existem; senão, padrões do painel de risco)</div></div>
   <div class="card"><div class="card-b" style="overflow-x:auto">
   <table class="tb radar-tb"><thead><tr><th style="min-width:230px">Indicador</th>${es.map(e=>{
-    const r=nivelRisco(e);return `<th><a href="#/emissao/${e.id}">${esc(tituloEmis(e))}</a><br>
-    <span class="pill ${r.cls}" style="margin-top:4px"><span class="dot"></span>${r.txt}</span></th>`;}).join('')}</tr></thead><tbody>
+    const sc=scoreRisco(e);return `<th><a href="#/emissao/${e.id}">${esc(tituloEmis(e))}</a><br>
+    <span class="pill ${sc.cls}" style="margin-top:4px" title="${esc(Object.entries(sc.detalhe).map(([c,v])=>c+': '+v).join(' · '))}"><span class="dot"></span>${sc.nota!=null?'Nota '+sc.nota+' · ':''}${sc.classe}</span></th>`;}).join('')}</tr></thead><tbody>
   ${rows.map(row=>{
     let head=''; if(row.cat!==cur){cur=row.cat;head=`<tr class="cat-row"><td colspan="${es.length+1}">${esc(cur)}</td></tr>`;}
     return head+`<tr><td>${esc(row.ind)}<div style="color:var(--muted);font-size:11px">${esc(row.ref||'')}</div></td>${es.map(e=>{
@@ -435,7 +518,7 @@ let TAB='visao';
 function renderLamina(id){
   const e=emisPorId(id); if(!e){location.hash='#/';return;}
   const mU=ultimoMesKpi(e), k=(e.kpi||{})[mU]||null, gaps=gapsEmis(e);
-  const tabs=[['visao','Visão Geral'],['fluxo','Fluxo & Pagamentos'],['carteira','Carteira & Inadimplência'],['obra','Obra'],['gc','Garantias & Covenants']];
+  const tabs=[['visao','Visão Geral'],['fluxo','Fluxo & Pagamentos'],['carteira','Carteira & Inadimplência'],['obra','Obra'],['gc','Garantias & Covenants'],['dossie','Dossiê documental']];
   $('#app').innerHTML=`
   <div class="no-print" style="margin-bottom:10px"><a href="#/">Emissões</a> <span style="color:var(--muted)">›</span> ${esc(e.nome)}</div>
   <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
@@ -453,7 +536,7 @@ function renderLamina(id){
   <div id="panes"></div>
   <div class="footer-note">Última safra da planilha: <b>${fmtM(mU)}</b> · arquivo: ${esc(e.arquivo||'—')} · extração ${esc(e.gerado||'')} — dados brutos do consolidado; índices calculados pelo portal.</div>`;
   const P=$('#panes');
-  P.innerHTML = paneVisao(e,k,mU)+paneFluxo(e)+paneCarteira(e,k,mU)+paneObra(e)+paneGC(e);
+  P.innerHTML = paneVisao(e,k,mU)+paneFluxo(e)+paneCarteira(e,k,mU)+paneObra(e)+paneGC(e)+paneDossie(e);
   document.querySelectorAll('.tabpane').forEach(el=>{el.style.display = el.dataset.tab===TAB?'block':'none';});
   montarChartsLamina(e);
 }
@@ -555,6 +638,28 @@ function paneGC(e){
     </tbody></table>
     <div class="footer-note">A verificação ativa roda em <b>tarefa mensal automática</b> (Claude confere esta base e envia o resumo do que está vencido/sem evidência).</div></div></div>`);
 }
+function paneDossie(e){
+  const d=e.dossie;
+  const stPill=s=>({presente:['ok','Presente'],na_nuvem:['mut','Na nuvem (baixar)'],ausente:['bad','Ausente'],desatualizado:['warn','Desatualizado']}[s]||['mut',s]);
+  return pane('dossie',`
+  <div class="kpis">
+    <div class="kpi"><div class="l">Score documental</div><div class="v num" style="color:${d&&d.score_documental>=70?'var(--ok)':d&&d.score_documental>=40?'var(--warn)':'var(--bad)'}">${d?(d.score_documental??'—')+'/100':'—'}</div><div class="s">${d?('obrigatórios presentes: '+d.obrigatorios_presentes):'rodar python diagnostico.py'}</div></div>
+    <div class="kpi"><div class="l">Última varredura</div><div class="v num" style="font-size:16px">${d?esc(d.gerado):'—'}</div><div class="s">diagnostico.py varre as pastas sozinho</div></div>
+    <div class="kpi"><div class="l">Pastas rastreadas</div><div class="v num" style="font-size:16px">${d?(d.pastas_busca||[]).length:'—'}</div><div class="s">${d?esc((d.pastas_busca||[]).join('; ')||'nenhuma pasta local — docs na nuvem'):''}</div></div>
+  </div>
+  <div class="card"><div class="card-h"><h2>Dossiê documental da emissão</h2><div class="hint">o que todo CRI precisa ter, por quê, e o que o rastreador encontrou</div></div>
+    <div class="card-b" style="overflow-x:auto"><table class="tb"><thead><tr><th>Documento</th><th>Categoria</th><th>Por que precisa</th><th>Renovação</th><th>Status</th><th>Últ. período</th><th class="r">Arq.</th></tr></thead><tbody>
+    ${d?(d.itens||[]).map(i=>{const [cls,txt]=stPill(i.status);
+      return `<tr><td><b>${esc(i.nome)}</b>${i.obrigatorio?'':' <span class="chip">condicional</span>'}</td>
+      <td>${esc(i.cat)}</td><td style="max-width:340px;color:var(--muted)">${esc(i.motivo)}</td>
+      <td>${i.period?i.period+' m':'—'}</td>
+      <td><span class="pill ${cls}"><span class="dot"></span>${txt}</span></td>
+      <td class="num">${i.mais_recente?fmtM(i.mais_recente):'—'}</td><td class="r num">${i.qtd||'—'}</td></tr>`;}).join('')
+    :'<tr><td colspan="7" style="color:var(--muted)">Sem diagnóstico — rode <code>python diagnostico.py</code> e depois <code>python atualizar_dados.py</code>.</td></tr>'}
+    </tbody></table>
+    <div class="footer-note">“Na nuvem” = pasta OneDrive da emissão ainda não baixada para o monitoramento. Ao trazer os arquivos
+    (renomeando a pasta para “CRI &lt;NOME&gt;”) e rodar o diagnóstico, o status muda sozinho e os avisos somem.</div></div></div>`);
+}
 function pedidoVerificacao(id,i){
   const e=emisPorId(id), c=e.covenants[i], st=statusCovenant(c);
   const txt=`Prezados,\n\nNo monitoramento do ${tituloEmis(e)}, identificamos a seguinte pendência de verificação:\n\n• Item: ${c.nome}\n• Situação: ${st.txt}\n• Periodicidade prevista: ${c.periodicidade_meses?c.periodicidade_meses+' meses':'pontual'}\n• Responsável: ${c.responsavel||'—'}\n\nSolicitamos o envio da evidência atualizada (documento/certidão/relatório) ou o posicionamento sobre o item.${c.consequencia?'\n\nRessaltamos que, nos termos dos documentos da operação: '+c.consequencia:''}\n\nAtenciosamente,\nEquipe de Monitoramento — Highpar`;
@@ -570,7 +675,7 @@ function montarChartsLamina(e){
     const rt=meses.map(m=>(e.pag_cri||{})[m]||0);
     let acc=0; const liq=meses.map((m,i)=>{acc+=rt[i]-ap[i];return acc;});
     novoChart(elF,{type:'bar',data:{labels:meses.map(fmtM),datasets:[
-      {label:'Aportes (integralização)',data:ap.map(v=>-v),backgroundColor:'#9DB8AF'},
+      {label:'Aportes (integralização)',data:ap.map(v=>-v),backgroundColor:'#A9BCD6'},
       {label:'Retornos (pagamento CRI)',data:rt,backgroundColor:CORES.brand},
       {label:'Fluxo acumulado',data:liq,type:'line',borderColor:CORES.gold,backgroundColor:CORES.gold,tension:.25,pointRadius:0,borderWidth:2}]},
       options:{maintainAspectRatio:false,scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>fmtBRLc(v)}}},
@@ -581,7 +686,7 @@ function montarChartsLamina(e){
     const meses=[...new Set([...(e.receb_mensal||[]).map(r=>r.m),...Object.keys(e.receber_prev||{})])].sort();
     novoChart(elR,{type:'bar',data:{labels:meses.map(fmtM),datasets:[
       {label:'Recebido (extrato)',data:meses.map(m=>(((e.receb_mensal||[]).find(r=>r.m===m))||{}).v||0),backgroundColor:CORES.brand},
-      {label:'Esperado (servicer)',data:meses.map(m=>(e.receber_prev||{})[m]||0),backgroundColor:'#D8C58C'}]},
+      {label:'Esperado (servicer)',data:meses.map(m=>(e.receber_prev||{})[m]||0),backgroundColor:'#E6C89C'}]},
       options:{maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtBRLc(v)}},x:{grid:{display:false}}},
       plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtBRL(c.raw)}}}}});
   }
@@ -606,7 +711,7 @@ function montarChartsLamina(e){
   if(elO&&(e.obra||[]).length){
     const o=e.obra; let acc=0; const ac=o.map(x=>{acc+=x.pct||0;return acc*100;});
     novoChart(elO,{type:'bar',data:{labels:o.map(x=>fmtM(x.m)),datasets:[
-      {label:'% no mês',data:o.map(x=>(x.pct||0)*100),backgroundColor:'#9DB8AF'},
+      {label:'% no mês',data:o.map(x=>(x.pct||0)*100),backgroundColor:'#A9BCD6'},
       {label:'Acumulado',data:ac,type:'line',borderColor:CORES.brand,backgroundColor:CORES.brand,tension:.25,pointRadius:2,borderWidth:2}]},
       options:{maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>v.toLocaleString('pt-BR')+'%'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}}});
   }
@@ -739,6 +844,17 @@ function parseConsolidado(wb,arq){
     pag_cri,integ,receber_prev,obra,orcamento:+cel(cfg,'B9')||0,inad_trail:[],inad_faixas:[],farol_regras:farol,garantias,
     covenants:[],posicao_highpar:null,status:'Ativa',validacao:null};
 }
+/* ---- integração com outros sistemas (apêndice/anexável) ----
+   • iframe:  <iframe src=".../index.html?embed=1#/emissao/cri_uniq">  (esconde topo/avisos)
+   • API:     window.HighparCRI = {versao, dados, abrir(id), avisos(), score(id)}
+   • dados:   dados.json (contrato estável, gerado por atualizar_dados.py)         */
+if(new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');
+window.HighparCRI={versao:'v4-ATUALIZADO1',
+  get dados(){return BASE},
+  abrir:id=>{location.hash='#/emissao/'+id;},
+  avisos:()=>gerarAvisos(),
+  score:id=>{const e=emisPorId(id);return e?scoreRisco(e):null;}};
+try{if(window.parent!==window)window.parent.postMessage({tipo:'highpar-cri:ready',emissoes:BASE.emissoes.map(e=>e.id)},'*');}catch(_){}
 router();
 </script>
 </body>
