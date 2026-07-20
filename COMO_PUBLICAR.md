@@ -4,7 +4,7 @@ O portal é `index.html` + `dados.json` (o banco de dados, versionado junto).
 Home = portfólio: um card por emissão com farol; clique no card (ou no menu
 lateral) para abrir a lâmina completa da emissão.
 
-## Rotina de atualização (1 comando)
+## Rotina de atualização local
 
 Na pasta `Padrao Consolidado CRI`:
 
@@ -19,6 +19,19 @@ existe, ela é atualizada; se for nova, é adicionada. Ao rodar para um arquivo
 específico, as demais emissões já publicadas são preservadas.
 Arquivos com `backup`, `teste` ou `template` no nome sao ignorados na varredura automatica.
 Para arquivos específicos: `python atualizar_dados.py "Consolidado - CRI UNIQ.xlsx"`.
+
+## Trava antes de publicar
+
+Antes de substituir uma versão compartilhada, use:
+
+```
+python atualizar_dados.py --publicar
+```
+
+Esse modo não grava `dados.json` nem `dados.js` quando faltam características,
+séries, KPIs, limiares do radar ou quando a última safra está defasada em mais
+de dois meses. A base ativa permanece intacta e o motivo do bloqueio é listado.
+Os dois arquivos são preparados e validados juntos antes da substituição.
 
 ## Ver localmente
 
@@ -41,7 +54,7 @@ arquivo direto do disco — precisa de servidor ou hospedagem).
    gh repo create highpar-cri --public --source . --push
    ```
 3. No GitHub: Settings → Pages → Deploy from branch → `main`, pasta `/ (root)`.
-4. **Todo mês:** rode `python atualizar_dados.py`, depois:
+4. **Todo mês:** rode `python atualizar_dados.py --publicar`, depois:
    ```
    cd site
    git add dados.json && git commit -m "safra do mês" && git push

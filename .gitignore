@@ -1,4 +1,6 @@
 index_antigo_azul.html
+*.bak
+*.bak_*
 .DS_Store
 Thumbs.db
 __pycache__/
